@@ -1,0 +1,26 @@
+apiVersion: margo.org/v1-alpha1
+kind: ApplicationDescription
+metadata:
+  id: logiccloud-control
+  name: logiccloud Control
+  description: The modern automation app! With logiccloud, you get all the
+    features you need for innovative automation apps.
+  version: 4.10.18
+  catalog:
+    application:
+      icon: ./resources/logiccloud-control-logo.png
+      site: https://logiccloud.com
+      tags: []
+    author:
+      - name: logiccloud AG
+        email: info@logiccloud.de
+    organization:
+      - name: logiccloud AG
+        site: https://logiccloud.com
+deploymentProfiles:
+  - type: compose
+    id: logiccloud-control-compose
+    components:
+      - name: logiccloud-control
+        properties:
+          packageLocation: https://console-dev.flecs.tech/api/v2/manifests/io.logiccloud.control/4.10.18
