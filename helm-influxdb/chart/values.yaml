@@ -1,0 +1,40 @@
+# Values of the wrapper chart influxdb2-restricted. Everything below is
+# passed to the unchanged upstream subchart influxdata/influxdb2 2.1.2.
+#
+# The kubernetes-agent sets every Margo parameter as a string (like
+# `helm --set-string`). The typed values that make the pod pass Pod Security
+# "restricted" (booleans, user IDs, the capability list) therefore live here,
+# not in app/margo.yaml. The string values an operator may change (password,
+# organisation, sizes, resources) are Margo parameters.
+influxdb2:
+  image:
+    repository: influxdb
+    # The upstream chart pins 2.7.4 (2023-12); 2.9.1 is the current 2.x release.
+    tag: 2.9.1-alpine
+  # Container security context: Pod Security "restricted". The upstream
+  # chart renders this map with toYaml and derives the pod's fsGroup from
+  # runAsGroup. UID/GID 1000 is the image's own influxdb user.
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+  # The agent's Role cannot create PodDisruptionBudgets (KA-A-20).
+  pdb:
+    create: false
+  service:
+    port: 8086
+  persistence:
+    enabled: true
+    size: 8Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi

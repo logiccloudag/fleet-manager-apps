@@ -1,0 +1,169 @@
+apiVersion: margo/v1alpha1
+kind: ApplicationDescription
+id: grafana
+metadata:
+  name: Grafana
+  version: "1.0.0"
+  description: >-
+    Grafana 13 for dashboards and visualisation of time series data, installed
+    from the upstream grafana-community Helm chart. Runs under Pod Security
+    "restricted" with namespace-scoped resources only.
+  catalog:
+    organization:
+      - name: logiccloud
+        site: https://logiccloud.io
+    application:
+      tagline: Dashboards and visualisation for metrics, logs and time series.
+      icon: icon.png
+      releaseNotes: release-notes.md
+      site: https://grafana.com/oss/grafana/
+      tags:
+        - monitoring
+        - dashboards
+        - visualisation
+deploymentProfiles:
+  - type: helm
+    id: kubernetes
+    components:
+      - name: grafana
+        properties:
+          # Unchanged mirror of oci://ghcr.io/grafana-community/helm-charts/grafana.
+          repository: oci://ghcr.io/logiccloudag/margo-charts/grafana
+          revision: "13.2.7"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.5
+        architectures:
+          - amd64
+          - arm64
+      memory: 512Mi
+      storage: 5Gi
+# Every parameter reaches the kubernetes-agent as a string and is set like
+# `helm --set-string` at the dot path in `pointer`. Helm treats every
+# non-empty string as true, so a chart boolean that defaults to true can only
+# be switched off with the empty string "". The parameters marked "Fixed" make
+# the chart pass Pod Security "restricted" and stay inside the agent's
+# namespace-scoped Role. They are not listed in `configuration`: do not
+# override them.
+parameters:
+  # Fixed: the agent's Role cannot create Role, RoleBinding or ClusterRole
+  # objects. Grafana needs RBAC only for its (disabled) sidecars.
+  rbacCreate:
+    value: ""
+    targets:
+      - pointer: rbac.create
+        components: [grafana]
+  # Fixed: keep any RBAC the chart renders namespaced (no ClusterRole).
+  rbacNamespaced:
+    value: "true"
+    targets:
+      - pointer: rbac.namespaced
+        components: [grafana]
+  # Fixed: the init-chown-data init container runs as root, which Pod
+  # Security "restricted" forbids. The pod's fsGroup (472) already gives
+  # Grafana write access to the volume.
+  initChownDataEnabled:
+    value: ""
+    targets:
+      - pointer: initChownData.enabled
+        components: [grafana]
+  # Fixed: no `helm test` resources.
+  testFrameworkEnabled:
+    value: ""
+    targets:
+      - pointer: testFramework.enabled
+        components: [grafana]
+  # Fixed: store dashboards and the SQLite database on a PVC of the cluster
+  # default StorageClass. "false" would NOT disable it (non-empty string).
+  persistenceEnabled:
+    value: "true"
+    targets:
+      - pointer: persistence.enabled
+        components: [grafana]
+  persistenceSize:
+    value: "5Gi"
+    targets:
+      - pointer: persistence.size
+        components: [grafana]
+  servicePort:
+    value: "80"
+    targets:
+      - pointer: service.port
+        components: [grafana]
+  adminUser:
+    value: "admin"
+    targets:
+      - pointer: adminUser
+        components: [grafana]
+  # Empty: the chart generates a random password and keeps it in the Secret
+  # <release>-grafana (key admin-password) across upgrades.
+  adminPassword:
+    value: ""
+    targets:
+      - pointer: adminPassword
+        components: [grafana]
+  # Name of an existing Secret in the agent's namespace with the keys
+  # admin-user and admin-password. Takes precedence over adminUser and
+  # adminPassword when set.
+  adminExistingSecret:
+    value: ""
+    targets:
+      - pointer: admin.existingSecret
+        components: [grafana]
+  cpuRequest:
+    value: "100m"
+    targets:
+      - pointer: resources.requests.cpu
+        components: [grafana]
+  memoryRequest:
+    value: "128Mi"
+    targets:
+      - pointer: resources.requests.memory
+        components: [grafana]
+  memoryLimit:
+    value: "512Mi"
+    targets:
+      - pointer: resources.limits.memory
+        components: [grafana]
+configuration:
+  sections:
+    - name: Administrator
+      settings:
+        - parameter: adminUser
+          name: Administrator user name
+          schema: text
+        - parameter: adminPassword
+          name: Administrator password (empty generates one)
+          schema: text
+        - parameter: adminExistingSecret
+          name: Existing Secret with admin-user and admin-password
+          schema: text
+    - name: Service and storage
+      settings:
+        - parameter: servicePort
+          name: Service port
+          schema: port
+        - parameter: persistenceSize
+          name: Volume size
+          schema: quantity
+          immutable: true
+    - name: Resources
+      settings:
+        - parameter: cpuRequest
+          name: CPU request
+          schema: quantity
+        - parameter: memoryRequest
+          name: Memory request
+          schema: quantity
+        - parameter: memoryLimit
+          name: Memory limit
+          schema: quantity
+  schema:
+    - name: text
+      dataType: string
+    - name: port
+      dataType: string
+    - name: quantity
+      dataType: string

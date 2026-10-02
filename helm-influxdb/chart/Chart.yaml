@@ -1,0 +1,21 @@
+apiVersion: v2
+name: influxdb2-restricted
+description: >-
+  InfluxDB 2 for the kubernetes-agent. A thin wrapper around the unchanged
+  upstream influxdata/influxdb2 chart that sets the typed values Pod Security
+  "restricted" and the agent's namespace-scoped Role need. Margo parameters
+  reach the agent as strings only, so these values cannot be set through
+  parameters (see the repository README, "Why InfluxDB is wrapped").
+type: application
+version: 0.1.0
+appVersion: "2.9.1"
+home: https://github.com/logiccloudag/fleet-manager-apps
+sources:
+  - https://github.com/influxdata/helm-charts/tree/master/charts/influxdb2
+  - https://github.com/influxdata/influxdb
+annotations:
+  artifacthub.io/license: MIT
+dependencies:
+  - name: influxdb2
+    version: 2.1.2
+    repository: https://helm.influxdata.com

@@ -1,0 +1,136 @@
+apiVersion: margo/v1alpha1
+kind: ApplicationDescription
+id: mosquitto
+metadata:
+  name: Eclipse Mosquitto
+  version: "1.0.0"
+  description: >-
+    Eclipse Mosquitto 2 MQTT broker (MQTT 3.1, 3.1.1 and 5.0), installed from
+    the upstream TrueCharts Helm chart with the official eclipse-mosquitto
+    image. Runs under Pod Security "restricted" with namespace-scoped
+    resources only. Clients connect anonymously: the chart has no user or
+    password values.
+  catalog:
+    organization:
+      - name: logiccloud
+        site: https://logiccloud.io
+    application:
+      tagline: Lightweight MQTT message broker for IoT and pub/sub messaging.
+      icon: icon.png
+      releaseNotes: release-notes.md
+      site: https://mosquitto.org
+      tags:
+        - mqtt
+        - messaging
+        - iot
+deploymentProfiles:
+  - type: helm
+    id: kubernetes
+    components:
+      - name: mosquitto
+        properties:
+          # Unchanged mirror of oci://oci.trueforge.org/truecharts/mosquitto.
+          repository: oci://ghcr.io/logiccloudag/margo-charts/mosquitto
+          revision: "18.10.0"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.25
+        architectures:
+          - amd64
+          - arm64
+      memory: 256Mi
+      storage: 2Gi
+# Every parameter reaches the kubernetes-agent as a string and is set like
+# `helm --set-string` at the dot path in `pointer`. The chart's own defaults
+# already pass Pod Security "restricted" (non-root UID 568, seccomp
+# RuntimeDefault, no privilege escalation, all capabilities dropped, read-only
+# root file system) and render only Service, ConfigMap, PVC and Deployment
+# objects. The parameter marked "Fixed" is not listed in `configuration`: do
+# not override it.
+parameters:
+  # Fixed: the TrueCharts common library pins every pod to
+  # kubernetes.io/arch=amd64 by default. A pointer cannot address the key
+  # (it contains dots), so the empty string replaces the whole map and the
+  # pod schedules on amd64 and arm64 nodes (the image is multi-arch).
+  podNodeSelector:
+    value: ""
+    targets:
+      - pointer: podOptions.nodeSelector
+        components: [mosquitto]
+  # Service port of the MQTT listener. The broker itself always listens on
+  # 1883 inside the pod.
+  servicePort:
+    value: "1883"
+    targets:
+      - pointer: service.main.ports.main.port
+        components: [mosquitto]
+  # Message store (persistence_location). PVC of the cluster default
+  # StorageClass. The chart's default is 100Gi.
+  dataVolumeSize:
+    value: "1Gi"
+    targets:
+      - pointer: persistence.data.size
+        components: [mosquitto]
+  # Volume for extra configuration files (include_dir). The chart's default
+  # is 100Gi.
+  configVolumeSize:
+    value: "100Mi"
+    targets:
+      - pointer: persistence.configinc.size
+        components: [mosquitto]
+  cpuRequest:
+    value: "50m"
+    targets:
+      - pointer: resources.requests.cpu
+        components: [mosquitto]
+  memoryRequest:
+    value: "64Mi"
+    targets:
+      - pointer: resources.requests.memory
+        components: [mosquitto]
+  cpuLimit:
+    value: "500m"
+    targets:
+      - pointer: resources.limits.cpu
+        components: [mosquitto]
+  memoryLimit:
+    value: "256Mi"
+    targets:
+      - pointer: resources.limits.memory
+        components: [mosquitto]
+configuration:
+  sections:
+    - name: Service and storage
+      settings:
+        - parameter: servicePort
+          name: MQTT service port
+          schema: port
+        - parameter: dataVolumeSize
+          name: Message store volume size
+          schema: quantity
+          immutable: true
+        - parameter: configVolumeSize
+          name: Extra configuration volume size
+          schema: quantity
+          immutable: true
+    - name: Resources
+      settings:
+        - parameter: cpuRequest
+          name: CPU request
+          schema: quantity
+        - parameter: memoryRequest
+          name: Memory request
+          schema: quantity
+        - parameter: cpuLimit
+          name: CPU limit
+          schema: quantity
+        - parameter: memoryLimit
+          name: Memory limit
+          schema: quantity
+  schema:
+    - name: port
+      dataType: string
+    - name: quantity
+      dataType: string

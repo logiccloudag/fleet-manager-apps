@@ -1,0 +1,117 @@
+apiVersion: margo/v1alpha1
+kind: ApplicationDescription
+id: node-red
+metadata:
+  name: Node-RED
+  version: "1.0.0"
+  description: >-
+    Node-RED 4 low-code flow editor for wiring devices, APIs and services,
+    installed from the upstream schwarzit Helm chart. Runs under Pod Security
+    "restricted" with namespace-scoped resources only.
+  catalog:
+    organization:
+      - name: logiccloud
+        site: https://logiccloud.io
+    application:
+      tagline: Low-code, flow-based programming for event-driven applications.
+      icon: icon.png
+      releaseNotes: release-notes.md
+      site: https://nodered.org
+      tags:
+        - flows
+        - integration
+        - iot
+deploymentProfiles:
+  - type: helm
+    id: kubernetes
+    components:
+      - name: node-red
+        properties:
+          # Unchanged mirror of oci://ghcr.io/schwarzit/charts/node-red.
+          repository: oci://ghcr.io/logiccloudag/margo-charts/node-red
+          revision: "0.40.2"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.5
+        architectures:
+          - amd64
+          - arm64
+      memory: 512Mi
+      storage: 5Gi
+# Every parameter reaches the kubernetes-agent as a string and is set like
+# `helm --set-string` at the dot path in `pointer`. Helm treats every
+# non-empty string as true, so a chart boolean that defaults to true can only
+# be switched off with the empty string "". The parameters marked "Fixed" keep
+# the chart inside the agent's namespace-scoped Role. They are not listed in
+# `configuration`: do not override them. The chart's own defaults already
+# pass Pod Security "restricted" (non-root UID 1000, seccomp RuntimeDefault,
+# no privilege escalation, all capabilities dropped).
+parameters:
+  # Fixed: the agent's Role cannot create Role or RoleBinding objects. The
+  # chart's Role serves only the (disabled) flow-refresh sidecar.
+  rbacEnabled:
+    value: ""
+    targets:
+      - pointer: rbac.enabled
+        components: [node-red]
+  # Fixed: keep flows, credentials and installed nodes on a PVC of the
+  # cluster default StorageClass. "false" would NOT disable it.
+  persistenceEnabled:
+    value: "true"
+    targets:
+      - pointer: persistence.enabled
+        components: [node-red]
+  persistenceSize:
+    value: "5Gi"
+    targets:
+      - pointer: persistence.size
+        components: [node-red]
+  servicePort:
+    value: "1880"
+    targets:
+      - pointer: service.port
+        components: [node-red]
+  cpuRequest:
+    value: "100m"
+    targets:
+      - pointer: resources.requests.cpu
+        components: [node-red]
+  memoryRequest:
+    value: "128Mi"
+    targets:
+      - pointer: resources.requests.memory
+        components: [node-red]
+  memoryLimit:
+    value: "512Mi"
+    targets:
+      - pointer: resources.limits.memory
+        components: [node-red]
+configuration:
+  sections:
+    - name: Service and storage
+      settings:
+        - parameter: servicePort
+          name: Service port
+          schema: port
+        - parameter: persistenceSize
+          name: Volume size
+          schema: quantity
+          immutable: true
+    - name: Resources
+      settings:
+        - parameter: cpuRequest
+          name: CPU request
+          schema: quantity
+        - parameter: memoryRequest
+          name: Memory request
+          schema: quantity
+        - parameter: memoryLimit
+          name: Memory limit
+          schema: quantity
+  schema:
+    - name: port
+      dataType: string
+    - name: quantity
+      dataType: string

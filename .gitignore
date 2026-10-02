@@ -1,0 +1,2 @@
+# Downloaded dependency of the InfluxDB wrapper chart (helm dependency build).
+helm-influxdb/chart/charts/

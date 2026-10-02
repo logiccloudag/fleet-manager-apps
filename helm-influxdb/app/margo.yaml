@@ -1,0 +1,177 @@
+apiVersion: margo/v1alpha1
+kind: ApplicationDescription
+id: influxdb
+metadata:
+  name: InfluxDB 2
+  version: "1.0.0"
+  description: >-
+    InfluxDB 2.9 time series database with its web UI and HTTP API on one
+    port. Installed from influxdb2-restricted, a thin logiccloud wrapper
+    around the unchanged upstream influxdata/influxdb2 chart that adds the
+    typed Pod Security "restricted" settings the upstream chart lacks.
+  catalog:
+    organization:
+      - name: logiccloud
+        site: https://logiccloud.io
+    application:
+      tagline: Time series database for metrics, events and sensor data.
+      icon: icon.png
+      releaseNotes: release-notes.md
+      site: https://www.influxdata.com/products/influxdb/
+      tags:
+        - database
+        - time-series
+        - monitoring
+deploymentProfiles:
+  - type: helm
+    id: kubernetes
+    components:
+      - name: influxdb
+        properties:
+          # The wrapper chart in helm-influxdb/chart (it vendors the
+          # unchanged influxdata/influxdb2 2.1.2 chart as a dependency).
+          repository: oci://ghcr.io/logiccloudag/margo-charts/influxdb2-restricted
+          revision: "0.1.0"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.5
+        architectures:
+          - amd64
+          - arm64
+      memory: 1Gi
+      storage: 8Gi
+# Every parameter reaches the kubernetes-agent as a string and is set like
+# `helm --set-string` at the dot path in `pointer`. The typed Pod Security
+# settings (non-root UID 1000, seccomp RuntimeDefault, no privilege
+# escalation, all capabilities dropped) and the disabled PodDisruptionBudget
+# are values of the wrapper chart, because a string cannot express them.
+# The pointers start with "influxdb2." because the upstream chart is a
+# dependency of the wrapper.
+parameters:
+  adminUser:
+    value: "admin"
+    targets:
+      - pointer: influxdb2.adminUser.user
+        components: [influxdb]
+  # Empty: the chart generates a random password and keeps it in the Secret
+  # <release>-influxdb2-auth (key admin-password) across upgrades.
+  adminPassword:
+    value: ""
+    targets:
+      - pointer: influxdb2.adminUser.password
+        components: [influxdb]
+  # Empty: the chart generates a random operator token (key admin-token).
+  adminToken:
+    value: ""
+    targets:
+      - pointer: influxdb2.adminUser.token
+        components: [influxdb]
+  # Name of an existing Secret in the agent's namespace with the keys
+  # admin-password and admin-token. Replaces the generated Secret when set.
+  adminExistingSecret:
+    value: ""
+    targets:
+      - pointer: influxdb2.adminUser.existingSecret
+        components: [influxdb]
+  organization:
+    value: "influxdata"
+    targets:
+      - pointer: influxdb2.adminUser.organization
+        components: [influxdb]
+  bucket:
+    value: "default"
+    targets:
+      - pointer: influxdb2.adminUser.bucket
+        components: [influxdb]
+  # Retention of the initial bucket, for example 720h; 0s keeps data forever.
+  retention:
+    value: "0s"
+    targets:
+      - pointer: influxdb2.adminUser.retention_policy
+        components: [influxdb]
+  servicePort:
+    value: "8086"
+    targets:
+      - pointer: influxdb2.service.port
+        components: [influxdb]
+  persistenceSize:
+    value: "8Gi"
+    targets:
+      - pointer: influxdb2.persistence.size
+        components: [influxdb]
+  cpuRequest:
+    value: "100m"
+    targets:
+      - pointer: influxdb2.resources.requests.cpu
+        components: [influxdb]
+  memoryRequest:
+    value: "256Mi"
+    targets:
+      - pointer: influxdb2.resources.requests.memory
+        components: [influxdb]
+  memoryLimit:
+    value: "1Gi"
+    targets:
+      - pointer: influxdb2.resources.limits.memory
+        components: [influxdb]
+configuration:
+  sections:
+    - name: Initial setup
+      settings:
+        - parameter: adminUser
+          name: Administrator user name
+          schema: text
+          immutable: true
+        - parameter: adminPassword
+          name: Administrator password (empty generates one)
+          schema: text
+          immutable: true
+        - parameter: adminToken
+          name: Operator API token (empty generates one)
+          schema: text
+          immutable: true
+        - parameter: adminExistingSecret
+          name: Existing Secret with admin-password and admin-token
+          schema: text
+          immutable: true
+        - parameter: organization
+          name: Organisation
+          schema: text
+          immutable: true
+        - parameter: bucket
+          name: Initial bucket
+          schema: text
+          immutable: true
+        - parameter: retention
+          name: Retention of the initial bucket
+          schema: text
+          immutable: true
+    - name: Service and storage
+      settings:
+        - parameter: servicePort
+          name: Service port
+          schema: port
+        - parameter: persistenceSize
+          name: Volume size
+          schema: quantity
+          immutable: true
+    - name: Resources
+      settings:
+        - parameter: cpuRequest
+          name: CPU request
+          schema: quantity
+        - parameter: memoryRequest
+          name: Memory request
+          schema: quantity
+        - parameter: memoryLimit
+          name: Memory limit
+          schema: quantity
+  schema:
+    - name: text
+      dataType: string
+    - name: port
+      dataType: string
+    - name: quantity
+      dataType: string
