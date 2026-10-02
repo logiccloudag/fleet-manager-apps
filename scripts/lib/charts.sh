@@ -58,7 +58,8 @@ verify_sha() {
 # writes <out-dir>/<chart>-<version>.tgz from the upstream source and prints
 # its path. A mirror chart is the upstream archive itself, checked against
 # its pinned digest. A wrapper chart is packaged from its directory after its
-# dependency was downloaded and checked against the pinned digest.
+# dependency was downloaded and checked against the pinned digest. A local
+# chart (no dependency, sha256 "-") is linted and packaged from its directory.
 fetch_upstream() {
   local chart="$1" version="$2" type="$3" source="$4" sha="$5" out="$6"
   local tmp tgz deps
@@ -98,6 +99,17 @@ REPOS
       deps="$(find "$tmp/src/charts" -name '*.tgz' | wc -l | tr -d ' ')"
       [ "$deps" = 1 ] || die "$chart: expected exactly one dependency archive, found $deps"
       verify_sha "$(find "$tmp/src/charts" -name '*.tgz')" "$sha"
+      helm package "$tmp/src" -d "$tmp" >/dev/null || die "$chart: helm package of $source failed"
+      tgz="$tmp/$chart-$version.tgz"
+      [ -f "$tgz" ] || die "$chart: the chart in $source is not $chart $version (check Chart.yaml against scripts/charts.tsv)"
+      ;;
+    local)
+      cp -R "$REPO_ROOT/$source" "$tmp/src"
+      [ ! -d "$tmp/src/charts" ] || die "$chart: a local chart has no dependencies (use type wrapper)"
+      helm lint --strict "$tmp/src" >"$tmp/lint.log" 2>&1 || {
+        cat "$tmp/lint.log" >&2
+        die "$chart: helm lint --strict of $source failed"
+      }
       helm package "$tmp/src" -d "$tmp" >/dev/null || die "$chart: helm package of $source failed"
       tgz="$tmp/$chart-$version.tgz"
       [ -f "$tgz" ] || die "$chart: the chart in $source is not $chart $version (check Chart.yaml against scripts/charts.tsv)"

@@ -1,0 +1,51 @@
+# Values of mosquitto-restricted. The kubernetes-agent sets every Margo
+# parameter as a string, so the templates read booleans with
+# `eq (toString ...) "true"` and numbers with `int`: "false", "8883" and
+# false, 8883 behave the same. The Pod Security settings are fixed in the
+# templates and are not values.
+
+image:
+  repository: docker.io/library/eclipse-mosquitto
+  tag: 2.1.2-alpine
+  # Multi-arch index digest of 2.1.2-alpine (amd64, arm64, ...). When set,
+  # the image is pulled by digest.
+  digest: sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408
+  pullPolicy: IfNotPresent
+
+# MQTT listener inside the pod. Must be 1024 or higher: the container runs
+# as UID 1883 without capabilities.
+listener:
+  port: 1883
+
+service:
+  # ClusterIP, NodePort or LoadBalancer.
+  type: ClusterIP
+  port: 1883
+
+auth:
+  # Anonymous clients are refused unless this is "true".
+  allowAnonymous: false
+  # Name of an existing Secret in the release namespace that holds a
+  # mosquitto password file (created with mosquitto_passwd). Empty: no
+  # password file, so with allowAnonymous false no client can connect.
+  existingSecret: ""
+  # Key of the password file in that Secret.
+  passwordFileKey: passwd
+
+persistence:
+  # "true": a PersistentVolumeClaim of the cluster's default StorageClass;
+  # otherwise an emptyDir (messages are lost on restart).
+  enabled: true
+  size: 1Gi
+  # Empty: the cluster's default StorageClass.
+  storageClassName: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+# Extra lines appended to mosquitto.conf.
+extraConfig: ""

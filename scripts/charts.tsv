@@ -5,11 +5,13 @@
 #   type     mirror: the upstream .tgz is pushed unchanged
 #            wrapper: the chart directory in the app is packaged; it vendors
 #            the upstream chart unchanged as a dependency
+#            local: the chart directory in the app is packaged; it has no
+#            dependency (sha256 is "-")
 #   source   mirror: the upstream chart (oci://... or <https repo>#<name>)
-#            wrapper: the chart directory, relative to the repository root
+#            wrapper, local: the chart directory, relative to the repository root
 #   sha256   SHA-256 of the upstream .tgz (for a wrapper: of the vendored
 #            dependency .tgz)
 helm-grafana	grafana	13.2.7	mirror	oci://ghcr.io/grafana-community/helm-charts/grafana	5189a48131311513ef7bf5e22f1ed6424cd1c7cec61bc1995fab04d3cf46f36a
 helm-influxdb	influxdb2-restricted	0.1.0	wrapper	helm-influxdb/chart	1da8b1e8a2b93e9acbb0bc9a9c0a3e526581ccde4bf271785d09699ed219ca08
-helm-mosquitto	mosquitto	18.10.0	mirror	oci://oci.trueforge.org/truecharts/mosquitto	4195a0aa70342481c4ce2fab55ae78726ff33234175699d9a1b657424f1cde84
+helm-mosquitto	mosquitto-restricted	0.1.0	local	helm-mosquitto/chart	-
 helm-node-red	node-red	0.40.2	mirror	oci://ghcr.io/schwarzit/charts/node-red	503b99d1cf5c0599c990f28ab63ed660d8389159f5d24f7bbaaf3ed150a016e2

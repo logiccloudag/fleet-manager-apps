@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mosquitto.fullname" . }}
+  labels:
+    {{- include "mosquitto.labels" . | nindent 4 }}
+data:
+  mosquitto.conf: |
+    listener {{ include "mosquitto.port" . }}
+    allow_anonymous {{ if include "mosquitto.isTrue" .Values.auth.allowAnonymous }}true{{ else }}false{{ end }}
+    {{- if .Values.auth.existingSecret }}
+    password_file /mosquitto/auth/{{ .Values.auth.passwordFileKey }}
+    {{- end }}
+    persistence true
+    persistence_location /mosquitto/data/
+    autosave_interval 300
+    log_dest stdout
+    {{- with .Values.extraConfig }}
+    {{- . | nindent 4 }}
+    {{- end }}

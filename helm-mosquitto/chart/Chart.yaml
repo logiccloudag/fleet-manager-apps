@@ -1,0 +1,20 @@
+apiVersion: v2
+name: mosquitto-restricted
+description: >-
+  Eclipse Mosquitto MQTT broker for the kubernetes-agent: the official
+  eclipse-mosquitto image (pinned by digest) under Pod Security "restricted",
+  with namespaced kinds only (ConfigMap, Service, PersistentVolumeClaim,
+  Deployment) and anonymous access disabled by default. Every value is read
+  string-safely, because the agent sets Margo parameters as strings.
+type: application
+version: 0.1.0
+appVersion: "2.1.2"
+kubeVersion: ">=1.21.0-0"
+home: https://github.com/logiccloudag/fleet-manager-apps
+sources:
+  - https://github.com/logiccloudag/fleet-manager-apps/tree/main/helm-mosquitto/chart
+  - https://github.com/eclipse-mosquitto/mosquitto
+  - https://hub.docker.com/_/eclipse-mosquitto
+keywords:
+  - mqtt
+  - mosquitto

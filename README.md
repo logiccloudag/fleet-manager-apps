@@ -18,6 +18,7 @@ helm-<app>/
   app/icon.png            catalog icon (256 px)
   app/release-notes.md    catalog release notes
 helm-influxdb/chart/      the influxdb2-restricted wrapper chart (see below)
+helm-mosquitto/chart/     the mosquitto-restricted chart (see below)
 scripts/charts.tsv        pinned chart per app: name, version, source, sha256
 scripts/check.sh          all checks (bart, fleet-manager rules, render, cluster)
 scripts/mirror-charts.sh  publishes the pinned charts to the mirror registry
@@ -35,13 +36,15 @@ profile with one component, whose chart lives at
 | --- | --- | --- | --- | --- | --- |
 | `grafana` | `grafana` 13.2.7 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.2.7 | Apache-2.0 | Grafana 13.2.3, `docker.io/grafana/grafana:13.2.3-distroless` (AGPL-3.0) | mirror |
 | `influxdb` | `influxdb2-restricted` 0.1.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
-| `mosquitto` | `mosquitto` 18.10.0 | `oci://oci.trueforge.org/truecharts/mosquitto` 18.10.0 | AGPL-3.0 | Eclipse Mosquitto 2.0.22, `docker.io/library/eclipse-mosquitto:2.0.22` (EPL-2.0/EDL-1.0), digest-pinned | mirror |
+| `mosquitto` | `mosquitto-restricted` 0.1.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, `docker.io/library/eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f…` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
 
 - **mirror**: `scripts/mirror-charts.sh` pushes the upstream `.tgz`
   unchanged. Its SHA-256 is pinned in `scripts/charts.tsv`.
 - **wrapper**: the chart is packaged from `helm-<app>/chart`. It contains
   the upstream chart unchanged as a dependency, whose `.tgz` SHA-256 is pinned.
+- **local**: the chart is packaged from `helm-<app>/chart` and has no
+  dependency.
 
 Every image is an official upstream image. No Bitnami chart or image is used.
 
@@ -51,17 +54,28 @@ Every image is an official upstream image. No Bitnami chart or image is used.
   It moved to `grafana-community/helm-charts`, a verified publisher.
 - **Node-RED.** The schwarzit chart is restricted-compliant by default.
 - **Mosquitto.** No official chart exists. The community charts we checked
-  render no security context, and a string parameter cannot add one (see
-  "kubernetes-agent constraints"). Those charts were HelmForge 1.5.0, k8sonlab
-  2.7.3, alekc 0.3.0 and bdclark 0.6.1. TrueCharts (trueforge-org/truecharts,
-  about 1,350 stars) is the only large-community chart that is restricted by
-  default and uses the official image. Three caveats:
-  - its license is AGPL-3.0: unchanged redistribution is permitted with the
-    license and a source reference (the chart's `sources`), but confirm that
-    a copyleft chart is acceptable before you use it outside test fleets;
-  - it requires Kubernetes 1.33 or later (`kubeVersion: '>=1.33.0-0'`);
-  - its common library pins pods to `kubernetes.io/arch: amd64`, which the
-    fixed parameter `podNodeSelector: ""` removes.
+  (HelmForge 1.5.0, k8sonlab 2.7.3, alekc 0.3.0, bdclark 0.6.1) render no
+  security context, and a string parameter cannot add one (see
+  "kubernetes-agent constraints"). TrueCharts 18.10.0 is restricted, but it
+  is AGPL-3.0, needs Kubernetes 1.33 and allows anonymous access. The
+  `mosquitto-restricted` chart in `helm-mosquitto/chart` therefore runs the
+  official image itself:
+  - it renders a ConfigMap, a Service, an optional PVC and a Deployment;
+  - it has fixed Pod Security `restricted` settings (UID 1883, read-only root
+    file system);
+  - it works on Kubernetes 1.21 and later (`kubeVersion: ">=1.21.0-0"`);
+  - anonymous access is off by default;
+  - it reads every value string-safely, so `"false"` works.
+
+  To let clients in, create a password file and a Secret in the agent's
+  namespace, and set the parameter `authExistingSecret` to its name:
+
+  ```sh
+  docker run --rm --entrypoint sh docker.io/library/eclipse-mosquitto:2.1.2-alpine \
+    -c 'mosquitto_passwd -c -b /tmp/passwd <user> <password> >/dev/null 2>&1; cat /tmp/passwd' >passwd
+  kubectl -n <agent-namespace> create secret generic mosquitto-users --from-file=passwd=passwd
+  ```
+
 - **InfluxDB: why it is wrapped.** We found no maintained, restricted-compliant
   InfluxDB 2 chart.
   - The official `influxdb2` chart renders no `runAsNonRoot`, no seccomp

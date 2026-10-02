@@ -1,0 +1,9 @@
+Mosquitto {{ .Chart.AppVersion }} listens on {{ include "mosquitto.fullname" . }}.{{ .Release.Namespace }}.svc:{{ int .Values.service.port }}.
+{{- if not (include "mosquitto.isTrue" .Values.auth.allowAnonymous) }}
+{{- if .Values.auth.existingSecret }}
+Clients authenticate against the password file in Secret {{ .Values.auth.existingSecret }} (key {{ .Values.auth.passwordFileKey }}).
+{{- else }}
+WARNING: anonymous access is disabled and auth.existingSecret is empty, so no client can connect.
+Create a Secret with a mosquitto_passwd file and set auth.existingSecret.
+{{- end }}
+{{- end }}

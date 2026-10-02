@@ -7,6 +7,8 @@
 #            is pushed unchanged (byte-identical)
 #   wrapper  the chart directory of the app is packaged after its dependency
 #            was downloaded and checked against its pinned sha256, then pushed
+#   local    the chart directory of the app (no dependency) is linted,
+#            packaged and pushed
 #
 # A version that already exists in the registry is never overwritten: an
 # identical mirror archive is skipped, any difference is an error (bump the
@@ -83,7 +85,7 @@ while IFS="$(printf '\t')" read -r app chart version type source sha; do
       log "$app: $MIRROR_REGISTRY/$chart:$version already holds the identical archive; skipped"
       continue
     fi
-    if [ "$type" = wrapper ] && same_chart "$tgz" "$WORK/existing/$chart/$chart-$version.tgz"; then
+    if [ "$type" != mirror ] && same_chart "$tgz" "$WORK/existing/$chart/$chart-$version.tgz"; then
       log "$app: $MIRROR_REGISTRY/$chart:$version already holds the same chart content; skipped"
       continue
     fi
