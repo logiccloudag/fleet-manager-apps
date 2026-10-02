@@ -9,7 +9,7 @@ data:
     listener {{ include "mosquitto.port" . }}
     allow_anonymous {{ if include "mosquitto.isTrue" .Values.auth.allowAnonymous }}true{{ else }}false{{ end }}
     {{- if .Values.auth.existingSecret }}
-    password_file /mosquitto/auth/{{ .Values.auth.passwordFileKey }}
+    password_file /mosquitto/auth/passwd
     {{- end }}
     persistence true
     persistence_location /mosquitto/data/

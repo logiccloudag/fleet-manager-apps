@@ -12,7 +12,10 @@
 - Works on Kubernetes 1.21 and later, including MicroShift.
 - **Anonymous access is disabled by default.** Clients authenticate against a
   `mosquitto_passwd` password file in an existing Secret
-  (`authExistingSecret`, key `authPasswordFileKey`).
+  (`authExistingSecret`, key `authPasswordFileKey`). A non-root init
+  container copies it into a memory-backed volume, owned by the broker's user
+  with mode 0600, because mosquitto 2.1 cannot read a Secret volume's
+  symlinked key. A changed Secret takes effect on the next pod start.
 - Runs under Pod Security `restricted`: UID 1883, seccomp `RuntimeDefault`,
   no privilege escalation, all capabilities dropped, read-only root file
   system. Renders only a ConfigMap, a Service, a PVC and a Deployment.

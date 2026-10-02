@@ -68,7 +68,11 @@ Every image is an official upstream image. No Bitnami chart or image is used.
   - it reads every value string-safely, so `"false"` works.
 
   To let clients in, create a password file and a Secret in the agent's
-  namespace, and set the parameter `authExistingSecret` to its name:
+  namespace, and set the parameter `authExistingSecret` to its name. A
+  non-root init container copies the file into a memory-backed volume, owned
+  by the broker's user with mode 0600: mosquitto 2.1 cannot read the
+  symlinked key of a Secret volume. A changed Secret takes effect on the next
+  pod start.
 
   ```sh
   docker run --rm --entrypoint sh docker.io/library/eclipse-mosquitto:2.1.2-alpine \
@@ -162,19 +166,12 @@ the fleet-manager UI does not offer them. Do not override them.
 
 ## Known issues
 
-- **kubernetes-agent 0.25.3 (main 46c46dc) rejects Grafana and mosquitto.** The
-  agent's pre-apply cluster-scope guard (`renderManifest` in
-  `internal/deploy/helm.go`) renders the chart client-only with Helm's default
-  capabilities, which report Kubernetes v1.20.0. A chart whose `kubeVersion`
-  excludes 1.20 therefore fails with `chart requires kubeVersion: ... which is
-  incompatible with Kubernetes v1.20.0`, before the real install would run
-  against the cluster's version. Affected here:
-  - Grafana (`^1.25.0-0`);
-  - mosquitto (`>=1.33.0-0`).
-
-  InfluxDB and Node-RED declare no `kubeVersion` and install. The fix is
-  to set `install.KubeVersion` and `install.APIVersions` from the cluster's
-  capabilities in the guard render.
+- **Grafana needs a kubernetes-agent with KA-201** (commit `7acc947` on main).
+  Older agents render the pre-apply guard
+  with Helm's default Kubernetes v1.20.0, and reject every chart whose
+  `kubeVersion` excludes 1.20. Grafana declares `^1.25.0-0`.
+- **Grafana does not run on MicroShift 4.8** (Kubernetes 1.21): its chart
+  requires 1.25. InfluxDB, Mosquitto and Node-RED do.
 
 ## Validation
 

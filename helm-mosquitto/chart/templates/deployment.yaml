@@ -28,6 +28,39 @@ spec:
         fsGroup: 1883
         seccompProfile:
           type: RuntimeDefault
+      {{- if .Values.auth.existingSecret }}
+      # mosquitto 2.1 cannot open a Secret volume's symlinked key and warns
+      # that it will refuse a password file it does not own. The init
+      # container (non-root, same image) copies the file into an emptyDir as
+      # UID 1883 with mode 0600. A changed Secret takes effect on the next
+      # pod start.
+      initContainers:
+        - name: password-file
+          image: {{ include "mosquitto.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - sh
+            - -c
+            - cp /secret/{{ .Values.auth.passwordFileKey }} /mosquitto/auth/passwd && chmod 0600 /mosquitto/auth/passwd
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+          volumeMounts:
+            - name: auth-secret
+              mountPath: /secret
+              readOnly: true
+            - name: auth
+              mountPath: /mosquitto/auth
+      {{- end }}
       containers:
         - name: mosquitto
           image: {{ include "mosquitto.image" . | quote }}
@@ -83,11 +116,15 @@ spec:
           emptyDir: {}
           {{- end }}
         {{- if .Values.auth.existingSecret }}
-        - name: auth
+        - name: auth-secret
           secret:
             secretName: {{ .Values.auth.existingSecret }}
             defaultMode: 0440
             items:
               - key: {{ .Values.auth.passwordFileKey }}
                 path: {{ .Values.auth.passwordFileKey }}
+        - name: auth
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
         {{- end }}
