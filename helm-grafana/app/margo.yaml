@@ -3,11 +3,13 @@ kind: ApplicationDescription
 id: grafana
 metadata:
   name: Grafana
-  version: "1.0.0"
+  version: "1.0.1"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
-    "restricted" with namespace-scoped resources only.
+    "restricted" with namespace-scoped resources only. Requires Kubernetes
+    1.25 or later (the chart declares kubeVersion ^1.25.0-0); it does not
+    install on older clusters such as MicroShift 4.8 (Kubernetes 1.21).
   catalog:
     organization:
       - name: logiccloud
