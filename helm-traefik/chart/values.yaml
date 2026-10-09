@@ -1,0 +1,38 @@
+# Values of traefik-restricted. The kubernetes-agent sets every Margo
+# parameter as a string, so the templates read numbers with `int`: "30080"
+# and 30080 behave the same. The Pod Security settings and the RBAC rules
+# are fixed in the templates and are not values.
+
+image:
+  repository: docker.io/library/traefik
+  tag: v3.7.14
+  # Multi-arch index digest of v3.7.14 (amd64, arm64, arm, ...). When set,
+  # the image is pulled by digest.
+  digest: sha256:575fa15b135078fe5e50aa847987d96dbddd7b093c172429618404df73f3fa7c
+  pullPolicy: IfNotPresent
+
+service:
+  # NodePort (default: works on devices without a load balancer),
+  # LoadBalancer or ClusterIP.
+  type: NodePort
+  # HTTP port of the Service.
+  port: 80
+  # Fixed node port for HTTP when type is NodePort or LoadBalancer (30000 to
+  # 32767). Empty: Kubernetes picks one.
+  nodePort: ""
+
+# Only Ingresses with this ingress class annotation
+# (kubernetes.io/ingress.class) are served. Empty: Ingresses without the
+# annotation, with an empty one or with "traefik" are served. Traefik never
+# reads IngressClass objects here (they are cluster-scoped).
+ingressClass: ""
+
+# Traefik log level: TRACE, DEBUG, INFO, WARN, ERROR, FATAL or PANIC.
+logLevel: INFO
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi

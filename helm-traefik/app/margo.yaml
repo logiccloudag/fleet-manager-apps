@@ -1,0 +1,139 @@
+apiVersion: margo/v1alpha1
+kind: ApplicationDescription
+id: traefik
+metadata:
+  name: Traefik
+  version: "1.0.0"
+  description: >-
+    Traefik 3.7 ingress controller from the official traefik image, installed
+    from traefik-restricted, a small logiccloud chart. It serves the
+    Kubernetes Ingresses of the agent's namespace only, so the apps deployed
+    next to it (for example logiccloud Control with its Ingress enabled)
+    become reachable over HTTP. Runs under Pod Security "restricted" with
+    namespace-scoped resources only; needs a kubernetes-agent installed
+    with the opt-in workload RBAC (chart value workloadPermissions.rbac=true,
+    KA-211).
+  catalog:
+    organization:
+      - name: logiccloud
+        site: https://logiccloud.io
+    application:
+      tagline: Ingress controller for the apps on a device.
+      icon: icon.png
+      releaseNotes: release-notes.md
+      site: https://traefik.io/traefik
+      tags:
+        - ingress
+        - reverse-proxy
+        - http
+deploymentProfiles:
+  - type: helm
+    id: kubernetes
+    components:
+      - name: traefik
+        properties:
+          # The chart in helm-traefik/chart.
+          repository: oci://ghcr.io/logiccloudag/margo-charts/traefik-restricted
+          revision: "0.1.0"
+          wait: true
+          timeout: "5m0s"
+    requiredResources:
+      cpu:
+        cores: 0.1
+        architectures:
+          - amd64
+          - arm64
+      memory: 128Mi
+      storage: 64Mi
+# Every parameter reaches the kubernetes-agent as a string and is set like
+# `helm --set-string` at the dot path in `pointer`. The chart reads every
+# value string-safely: numbers may be strings.
+# The Pod Security settings (UID 65532, seccomp RuntimeDefault, no privilege
+# escalation, all capabilities dropped, read-only root file system) and the
+# namespaced Role (Ingresses, Services, EndpointSlices, Secrets of the
+# agent's namespace) are fixed in the chart and are not parameters.
+parameters:
+  # NodePort (devices without a load balancer), LoadBalancer or ClusterIP.
+  serviceType:
+    value: "NodePort"
+    targets:
+      - pointer: service.type
+        components: [traefik]
+  servicePort:
+    value: "80"
+    targets:
+      - pointer: service.port
+        components: [traefik]
+  # Fixed HTTP node port (30000 to 32767). Empty: Kubernetes picks one.
+  webNodePort:
+    value: ""
+    targets:
+      - pointer: service.nodePort
+        components: [traefik]
+  # Serve only Ingresses annotated kubernetes.io/ingress.class with this
+  # value. Empty: Ingresses without the annotation (or with "traefik").
+  ingressClass:
+    value: ""
+    targets:
+      - pointer: ingressClass
+        components: [traefik]
+  # TRACE, DEBUG, INFO, WARN, ERROR, FATAL or PANIC.
+  logLevel:
+    value: "INFO"
+    targets:
+      - pointer: logLevel
+        components: [traefik]
+  cpuRequest:
+    value: "50m"
+    targets:
+      - pointer: resources.requests.cpu
+        components: [traefik]
+  memoryRequest:
+    value: "64Mi"
+    targets:
+      - pointer: resources.requests.memory
+        components: [traefik]
+  memoryLimit:
+    value: "128Mi"
+    targets:
+      - pointer: resources.limits.memory
+        components: [traefik]
+configuration:
+  sections:
+    - name: Network
+      settings:
+        - parameter: serviceType
+          name: Service type (NodePort, LoadBalancer or ClusterIP)
+          schema: text
+        - parameter: servicePort
+          name: HTTP Service port
+          schema: port
+        - parameter: webNodePort
+          name: HTTP node port (empty for automatic)
+          schema: text
+    - name: Routing
+      settings:
+        - parameter: ingressClass
+          name: Ingress class annotation to serve (empty for unannotated)
+          schema: text
+        - parameter: logLevel
+          name: Log level
+          schema: text
+    - name: Resources
+      settings:
+        - parameter: cpuRequest
+          name: CPU request
+          schema: quantity
+        - parameter: memoryRequest
+          name: Memory request
+          schema: quantity
+        - parameter: memoryLimit
+          name: Memory limit
+          schema: quantity
+  schema:
+    - name: text
+      dataType: string
+    - name: port
+      dataType: string
+    - name: quantity
+      dataType: string

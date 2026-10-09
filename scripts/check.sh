@@ -202,6 +202,21 @@ rules:
   - apiGroups: [batch]
     resources: [jobs, cronjobs]
     verbs: [get, list, watch, create, update, patch, delete]
+  # Optional rows: workloadPermissions.ingresses (KA-208, on by default)
+  # and workloadPermissions.rbac (KA-211, opt-in): the check models an agent
+  # with the opt-in, as on the fleet-manager dev environment.
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    verbs: [get, update, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -223,14 +238,27 @@ YAML
 check_cluster() {
   local rel="$COMPONENT-check" rc=0 notready failed_events
   # 1. kubectl server-side dry run of the rendered objects: PSA warnings
-  #    for workload objects arrive as "Warning:" lines.
-  kubectl apply --dry-run=server -n "$CHECK_NAMESPACE" --as "$AS_USER" -f "$WORK/rendered.yaml" >"$WORK/kdry.out" 2>&1 || rc=$?
+  #    for workload objects arrive as "Warning:" lines. RoleBindings are
+  #    left out: a dry run persists nothing, so the API server's bind check
+  #    cannot find a Role of the same render. The real install (step 3)
+  #    creates the Role first and checks the RoleBinding as the agent.
+  python3 - "$WORK/rendered.yaml" "$WORK/dryrun.yaml" <<'PY'
+import sys, yaml
+docs = [d for d in yaml.safe_load_all(open(sys.argv[1])) if d and d.get("kind") != "RoleBinding"]
+with open(sys.argv[2], "w") as fh:
+    yaml.safe_dump_all(docs, fh)
+PY
+  kubectl apply --dry-run=server -n "$CHECK_NAMESPACE" --as "$AS_USER" -f "$WORK/dryrun.yaml" >"$WORK/kdry.out" 2>&1 || rc=$?
   sed 's/^/  kubectl| /' "$WORK/kdry.out"
   if [ "$rc" != 0 ] || grep -qiE 'warning|podsecurity|forbidden' "$WORK/kdry.out"; then
     echo "  FAIL  kubectl apply --dry-run=server reported an error or a warning"
     return 1
   fi
-  echo "  PASS  kubectl apply --dry-run=server: no warning, no violation"
+  if grep -q '^kind: RoleBinding' "$WORK/rendered.yaml"; then
+    echo "  PASS  kubectl apply --dry-run=server: no warning, no violation (RoleBindings are checked by the real install)"
+  else
+    echo "  PASS  kubectl apply --dry-run=server: no warning, no violation"
+  fi
   # 2. helm install --dry-run=server (renders against the live cluster).
   helm install "$rel" "$TGZ" -n "$CHECK_NAMESPACE" -f "$VALUES" --kube-as-user "$AS_USER" \
     --dry-run=server >/dev/null 2>"$WORK/hdry.log" || rc=$?

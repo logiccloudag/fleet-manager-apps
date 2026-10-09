@@ -46,12 +46,17 @@ CLUSTER_SCOPED_KINDS = {
     "StorageClass", "PriorityClass", "APIService", "Namespace",
 }
 # Kinds the agent's namespace-scoped Role may create (KA-A-20 baseline,
-# kubernetes-agent infrastructure/e2e/ka-a-20-baseline.tsv). Anything else is
-# refused by the API server even when it is namespaced (Role, RoleBinding,
-# PodDisruptionBudget, NetworkPolicy, Ingress, ServiceMonitor, ...).
+# kubernetes-agent infrastructure/e2e/ka-a-20-baseline.tsv), including the
+# optional rows Ingress (workloadPermissions.ingresses, KA-208, on by
+# default) and Role/RoleBinding (workloadPermissions.rbac, KA-211, opt-in;
+# an app that renders one must say so in its description). Anything else is
+# refused by the API server even when it is namespaced (PodDisruptionBudget,
+# NetworkPolicy, ServiceMonitor, ...). A Role may only grant rules the agent
+# holds itself; the --cluster stage proves that with the agent's Role.
 AGENT_CREATABLE_KINDS = {
     "Service", "ConfigMap", "PersistentVolumeClaim", "ServiceAccount", "Secret",
     "Deployment", "ReplicaSet", "StatefulSet", "DaemonSet", "Job", "CronJob",
+    "Ingress", "Role", "RoleBinding",
 }
 # Pod Security "restricted": allowed volume types and capabilities.
 RESTRICTED_VOLUME_TYPES = {

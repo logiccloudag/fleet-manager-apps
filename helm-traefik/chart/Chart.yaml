@@ -1,0 +1,22 @@
+apiVersion: v2
+name: traefik-restricted
+description: >-
+  Traefik ingress controller for the kubernetes-agent: the official traefik
+  image (pinned by digest) under Pod Security "restricted", serving the
+  Kubernetes Ingresses of its own namespace only. Namespaced kinds only
+  (ServiceAccount, Role, RoleBinding, Service, Deployment), no CRDs and no
+  IngressClass. Every value is read string-safely, because the agent sets
+  Margo parameters as strings.
+type: application
+version: 0.1.0
+appVersion: "v3.7.14"
+kubeVersion: ">=1.21.0-0"
+home: https://github.com/logiccloudag/fleet-manager-apps
+sources:
+  - https://github.com/logiccloudag/fleet-manager-apps/tree/main/helm-traefik/chart
+  - https://github.com/traefik/traefik
+  - https://hub.docker.com/_/traefik
+keywords:
+  - traefik
+  - ingress
+  - reverse-proxy

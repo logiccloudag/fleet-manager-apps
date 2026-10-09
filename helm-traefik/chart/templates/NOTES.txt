@@ -1,0 +1,5 @@
+Traefik {{ .Chart.AppVersion }} serves the Ingresses of namespace {{ .Release.Namespace }} on Service {{ include "traefik.fullname" . }}, port {{ int .Values.service.port }} ({{ .Values.service.type | default "NodePort" }}).
+{{- if ne .Values.service.type "ClusterIP" }}
+Reach it at http://<node address>:<node port>/; the node port:
+  kubectl -n {{ .Release.Namespace }} get service {{ include "traefik.fullname" . }} -o jsonpath='{.spec.ports[0].nodePort}'
+{{- end }}

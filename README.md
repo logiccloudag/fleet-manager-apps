@@ -19,6 +19,7 @@ helm-<app>/
   app/release-notes.md    catalog release notes
 helm-influxdb/chart/      the influxdb2-restricted wrapper chart (see below)
 helm-mosquitto/chart/     the mosquitto-restricted chart (see below)
+helm-traefik/chart/       the traefik-restricted chart (see below)
 scripts/charts.tsv        pinned chart per app: name, version, source, sha256
 scripts/check.sh          all checks (bart, fleet-manager rules, render, cluster)
 scripts/mirror-charts.sh  publishes the pinned charts to the mirror registry
@@ -38,6 +39,7 @@ profile with one component, whose chart lives at
 | `influxdb` | `influxdb2-restricted` 0.1.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
 | `mosquitto` | `mosquitto-restricted` 0.1.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, `docker.io/library/eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f…` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
+| `traefik` | `traefik-restricted` 0.1.0 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.14, `docker.io/library/traefik:v3.7.14@sha256:575fa15b…` (MIT) | local |
 
 - **mirror**: `scripts/mirror-charts.sh` pushes the upstream `.tgz`
   unchanged. Its SHA-256 is pinned in `scripts/charts.tsv`.
@@ -79,6 +81,29 @@ Every image is an official upstream image. No Bitnami chart or image is used.
     -c 'mosquitto_passwd -c -b /tmp/passwd <user> <password> >/dev/null 2>&1; cat /tmp/passwd' >passwd
   kubectl -n <agent-namespace> create secret generic mosquitto-users --from-file=passwd=passwd
   ```
+
+- **Traefik.** The upstream chart (`oci://ghcr.io/traefik/helm/traefik`)
+  ships 25 CRDs in `crds/`. Helm installs them whatever the values say, and
+  the agent may never create a CRD. Its `rbac.namespaced` mode is otherwise
+  close to what the agent allows. The `traefik-restricted` chart in
+  `helm-traefik/chart` therefore runs the official image itself:
+  - it renders a ServiceAccount, a Role, a RoleBinding, a Service and a
+    Deployment;
+  - Traefik serves the Kubernetes Ingresses of its own namespace only
+    (`--providers.kubernetesingress.namespaces`, `disableClusterScopeResources`,
+    no IngressClass object), so on a cluster shared by several agents each
+    agent's Traefik routes only its own apps;
+  - its Role uses only rules the agent holds (`networking.k8s.io`, not
+    `extensions`): a Role can never grant more than the agent has;
+  - HTTP only, Service type NodePort by default (`serviceType`,
+    `webNodePort`);
+  - fixed Pod Security `restricted` settings (UID 65532, read-only root file
+    system).
+
+  It needs a kubernetes-agent installed with the opt-in
+  `workloadPermissions.rbac=true` (KA-211). To reach an app through it, enable
+  the app's Ingress (for logiccloud Control: `ingressEnabled: "true"`) and
+  open `http://<node address>:<Traefik node port>/`.
 
 - **InfluxDB: why it is wrapped.** We found no maintained, restricted-compliant
   InfluxDB 2 chart.
@@ -126,9 +151,16 @@ constraints 1 to 7; `--cluster` also exercises 8 on the test cluster.
    (`internal/deploy/helm.go`).
 4. **Only kinds the agent's Role can create.** The baseline Role (KA-A-20)
    allows Service, ConfigMap, PersistentVolumeClaim, ServiceAccount, Secret,
-   Deployment, ReplicaSet, StatefulSet, DaemonSet, Job and CronJob. A chart
-   that renders a Role, RoleBinding, PodDisruptionBudget, NetworkPolicy,
-   Ingress or ServiceMonitor fails with `forbidden`.
+   Deployment, ReplicaSet, StatefulSet, DaemonSet, Job and CronJob, and by
+   default also Ingress (`workloadPermissions.ingresses`, KA-208). Role and
+   RoleBinding need an agent installed with the opt-in
+   `workloadPermissions.rbac=true` (KA-211; the fleet-manager dev
+   environment sets it), and a Role may only grant rules the agent holds
+   itself (Kubernetes RBAC escalation prevention; the agent has no
+   `escalate` or `bind`). A chart that renders a PodDisruptionBudget,
+   NetworkPolicy or ServiceMonitor, or a Role with rules the agent lacks,
+   fails with `forbidden`. Apps that bring a Role (Traefik) say so in their
+   description.
 5. **Pod Security `restricted`.** The agent's namespaces enforce it. Every
    container must have:
    - `runAsNonRoot`;

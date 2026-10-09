@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "traefik.fullname" . }}
+  labels:
+    {{- include "traefik.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "traefik.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "traefik.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "traefik.fullname" . }}
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: traefik
+          image: {{ include "traefik.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          args:
+            - --global.checkNewVersion=false
+            - --global.sendAnonymousUsage=false
+            - --entryPoints.web.address=:8000/tcp
+            - --entryPoints.traefik.address=:8080/tcp
+            - --ping=true
+            - --ping.entryPoint=traefik
+            - --providers.kubernetesingress=true
+            # Only the release namespace, and no cluster-scoped lookups
+            # (IngressClass, Nodes): the Role is namespaced.
+            - --providers.kubernetesingress.namespaces={{ .Release.Namespace }}
+            - --providers.kubernetesingress.disableClusterScopeResources=true
+            - --providers.kubernetesingress.allowEmptyServices=true
+            - --providers.kubernetesingress.ingressEndpoint.publishedService={{ .Release.Namespace }}/{{ include "traefik.fullname" . }}
+            {{- with .Values.ingressClass }}
+            - --providers.kubernetesingress.ingressClass={{ . }}
+            {{- end }}
+            - --log.level={{ .Values.logLevel | default "INFO" }}
+          ports:
+            - name: web
+              containerPort: 8000
+              protocol: TCP
+            - name: traefik
+              containerPort: 8080
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: traefik
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: traefik
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: traefik
+            periodSeconds: 20
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
