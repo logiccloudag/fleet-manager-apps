@@ -1,5 +1,9 @@
 # Release Notes
 
+## 2.0.1
+
+- `authExistingSecret` may now be left empty (no password file). fleet-manager showed it as required. The chart is unchanged.
+
 ## 2.0.0
 
 - The chart is now mosquitto-restricted 0.1.0, a small logiccloud chart in

@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.0.1
+
+- `adminPassword`, `adminToken` and `adminExistingSecret` may now be left empty: the chart then generates a random password and operator token, and an empty Secret name keeps the generated Secret. fleet-manager showed them as required. The chart is unchanged.
+
 ## 1.0.0
 
 Initial release.

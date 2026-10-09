@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: grafana
 metadata:
   name: Grafana
-  version: "1.0.1"
+  version: "1.0.2"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
@@ -138,10 +138,10 @@ configuration:
           schema: text
         - parameter: adminPassword
           name: Administrator password (empty generates one)
-          schema: text
+          schema: optionalText
         - parameter: adminExistingSecret
           name: Existing Secret with admin-user and admin-password
-          schema: text
+          schema: optionalText
     - name: Service and storage
       settings:
         - parameter: servicePort
@@ -165,6 +165,11 @@ configuration:
   schema:
     - name: text
       dataType: string
+    # Empty is a valid value (Margo allowEmpty, PR #212): without it
+    # fleet-manager marks a setting with an empty default as required.
+    - name: optionalText
+      dataType: string
+      allowEmpty: true
     - name: port
       dataType: string
     - name: quantity

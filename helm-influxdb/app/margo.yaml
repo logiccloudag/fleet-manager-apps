@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.0.0"
+  version: "1.0.1"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
@@ -126,15 +126,15 @@ configuration:
           immutable: true
         - parameter: adminPassword
           name: Administrator password (empty generates one)
-          schema: text
+          schema: optionalText
           immutable: true
         - parameter: adminToken
           name: Operator API token (empty generates one)
-          schema: text
+          schema: optionalText
           immutable: true
         - parameter: adminExistingSecret
           name: Existing Secret with admin-password and admin-token
-          schema: text
+          schema: optionalText
           immutable: true
         - parameter: organization
           name: Organisation
@@ -171,6 +171,11 @@ configuration:
   schema:
     - name: text
       dataType: string
+    # Empty is a valid value (Margo allowEmpty, PR #212): without it
+    # fleet-manager marks a setting with an empty default as required.
+    - name: optionalText
+      dataType: string
+      allowEmpty: true
     - name: port
       dataType: string
     - name: quantity

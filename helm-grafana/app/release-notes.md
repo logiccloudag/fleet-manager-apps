@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.0.2
+
+- `adminPassword` and `adminExistingSecret` may now be left empty (an empty password lets the chart generate one; an empty Secret name uses the password). fleet-manager showed them as required. The chart is unchanged.
+
 ## 1.0.1
 
 - Documents the cluster requirement: **Kubernetes 1.25 or later**. The
