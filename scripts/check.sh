@@ -104,10 +104,16 @@ stage() {
 # --- stage implementations ------------------------------------------------
 
 check_bart() {
-  local dir="$1" out="$WORK/bart.out" rc=0
-  docker run --rm -u "$(id -u):$(id -g)" -v "$REPO_ROOT/$dir:/w" -w /w "$BART_IMAGE" validate >"$out" 2>&1 || rc=$?
+  local dir="$1" out="$WORK/bart.out" app="$WORK/bart-app" rc=0 rules=0
+  # bart's bundled schema rejects every configuration.schema validation
+  # rule (allowEmpty, minLength, ...): the rules are checked by
+  # margo_check.py, and bart validates a copy without them, so its icon,
+  # release-notes and architecture checks still run.
+  rm -rf "$app" && cp -R "$REPO_ROOT/$dir" "$app"
+  python3 "$PY" schema-rules "$REPO_ROOT/$dir/app/margo.yaml" "$app/app/margo.yaml" || rules=1
+  docker run --rm -u "$(id -u):$(id -g)" -v "$app:/w" -w /w "$BART_IMAGE" validate >"$out" 2>&1 || rc=$?
   sed 's/^/  bart| /' "$out"
-  python3 "$PY" bart "$out" "$rc" "$REPO_ROOT/$dir/app/margo.yaml"
+  python3 "$PY" bart "$out" "$rc" "$REPO_ROOT/$dir/app/margo.yaml" && [ "$rules" = 0 ]
 }
 
 check_fleet_manager() {

@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.0.1
+
+- `webNodePort` and `ingressClass` may now be left empty, as their
+  descriptions say (automatic node port; serve unannotated Ingresses).
+  fleet-manager showed them as required. The chart is unchanged
+  (traefik-restricted 0.1.0).
+
 ## 1.0.0
 
 Initial release.

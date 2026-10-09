@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: traefik
 metadata:
   name: Traefik
-  version: "1.0.0"
+  version: "1.0.1"
   description: >-
     Traefik 3.7 ingress controller from the official traefik image, installed
     from traefik-restricted, a small logiccloud chart. It serves the
@@ -110,12 +110,12 @@ configuration:
           schema: port
         - parameter: webNodePort
           name: HTTP node port (empty for automatic)
-          schema: text
+          schema: optionalText
     - name: Routing
       settings:
         - parameter: ingressClass
           name: Ingress class annotation to serve (empty for unannotated)
-          schema: text
+          schema: optionalText
         - parameter: logLevel
           name: Log level
           schema: text
@@ -133,6 +133,11 @@ configuration:
   schema:
     - name: text
       dataType: string
+    # Empty is a valid value (Margo allowEmpty, PR #212): without it
+    # fleet-manager marks a setting with an empty default as required.
+    - name: optionalText
+      dataType: string
+      allowEmpty: true
     - name: port
       dataType: string
     - name: quantity

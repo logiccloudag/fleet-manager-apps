@@ -234,7 +234,18 @@ on any failure. The stages for each app are:
    directory`. The script tolerates that one failure, and only when every
    profile is `helm`. Any other failure, including the schema check, fails
    the stage. No stub `compose.yaml` is committed: it would make bart's
-   compose lints pass vacuously. To see bart's own output:
+   compose lints pass vacuously.
+
+   bart's bundled Margo JSON Schema types the items of
+   `configuration.schema` as the base `Schema` (`name`, `dataType`), not as
+   its subtypes, so it rejects every validation rule there, including
+   `allowEmpty` (Margo PR #212). fleet-manager needs `allowEmpty: true` to
+   show a setting with an empty default as optional (for example Traefik's
+   `webNodePort`). The script therefore checks those rules itself against
+   the subtypes of bart's own schema (`TextValidationSchema`,
+   `NumericIntegerValidationSchema`, ...), and bart validates a copy of
+   `margo.yaml` without them, so its icon, release-notes and architecture
+   checks still run. To see bart's own output:
 
    ```sh
    docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/helm-grafana:/w" -w /w cr.flecs.tech/flecs/bart:latest validate

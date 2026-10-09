@@ -5,6 +5,10 @@ Subcommands (each prints one line per finding and exits 1 on any failure):
 
   bart <bart-output> <exit-code> <margo.yaml>
       Interprets the output of `bart validate` for a helm-only app.
+  schema-rules <margo.yaml> <out-margo.yaml>
+      Checks the validation rules of configuration.schema (allowEmpty,
+      minLength, ...) against the Margo validation-schema subtypes and
+      writes a copy without them for bart (see cmd_schema_rules).
   fleet-manager <margo.yaml> <app-dir> <chart> <version> <registry>
       The ingest rules of fleet-manager's margo-manifest-parser.service.ts,
       plus the rules of this catalog (helm-only, mirror repository, pins).
@@ -123,6 +127,71 @@ def cmd_bart(output_path, exit_code, margo_path):
            "which does not apply to a helm-only app")
     elif not other:
         fail(f"bart validate exited {exit_code} without a reported check failure")
+
+
+# ------------------------------------------------------- schema rules
+
+# The validation-schema subtypes of bart's own Margo JSON Schema
+# (TextValidationSchema, BooleanValidationSchema, ...): the rule keys each
+# allows besides name and dataType, and their JSON types.
+SCHEMA_RULES = {
+    "text": {"allowEmpty": bool, "minLength": int, "maxLength": int, "regexMatch": str},
+    "boolean": {"allowEmpty": bool},
+    "integer": {"allowEmpty": bool, "minValue": int, "maxValue": int},
+    "double": {"allowEmpty": bool, "minValue": (int, float), "maxValue": (int, float),
+               "minPrecision": int, "maxPrecision": int},
+    "select": {"allowEmpty": bool, "multiselect": bool, "options": list},
+}
+
+
+def schema_subtypes(entry):
+    """The subtypes a configuration.schema entry may be, by its dataType."""
+    data_type = str(entry.get("dataType", ""))
+    if "options" in entry or data_type.startswith("array["):
+        return ["select"]
+    return {"string": ["text", "select"], "boolean": ["boolean"], "integer": ["integer"],
+            "double": ["double"]}.get(data_type, [])
+
+
+def cmd_schema_rules(margo_path, out_path):
+    """bart's bundled Margo JSON Schema types configuration.schema items as
+    the base Schema (name and dataType, additionalProperties false), never
+    as one of its subtypes, so it rejects every validation rule, including
+    allowEmpty (Margo PR #212), which fleet-manager needs to show an
+    optional setting. bart then skips the icon, release-notes and
+    architecture checks too. So the rules are checked here against the
+    subtypes of bart's own schema, and bart validates a copy without them."""
+    doc = load_yaml(margo_path)
+    schema = ((doc.get("configuration") or {}).get("schema")) or []
+    stripped = 0
+    for entry in schema:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        rules = {k: v for k, v in entry.items() if k not in ("name", "dataType")}
+        if not rules:
+            continue
+        subtypes = schema_subtypes(entry)
+        allowed = {}
+        for sub in subtypes:
+            allowed.update(SCHEMA_RULES[sub])
+        bad = [k for k, v in rules.items()
+               if k not in allowed or not isinstance(v, allowed[k]) or (allowed[k] is int and isinstance(v, bool))]
+        if not subtypes:
+            fail(f"configuration.schema '{name}': dataType {entry.get('dataType')!r} has no validation rules")
+        elif bad:
+            fail(f"configuration.schema '{name}': rule(s) {', '.join(sorted(bad))} not valid for "
+                 f"{'/'.join(subtypes)} (allowed: {', '.join(sorted(allowed))})")
+        else:
+            ok(f"configuration.schema '{name}': rules {', '.join(sorted(rules))} valid for {'/'.join(subtypes)}")
+        for k in rules:
+            del entry[k]
+        stripped += 1
+    with open(out_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+    if stripped:
+        print(f"  INFO  bart validates a copy without the rules of {stripped} schema entr"
+              f"{'y' if stripped == 1 else 'ies'} (its bundled schema lacks the subtypes)")
 
 
 # ------------------------------------------------------------ fleet-manager
@@ -446,6 +515,8 @@ def main(argv):
     cmd, args = argv[1], argv[2:]
     if cmd == "bart" and len(args) == 3:
         cmd_bart(*args)
+    elif cmd == "schema-rules" and len(args) == 2:
+        cmd_schema_rules(*args)
     elif cmd == "fleet-manager" and len(args) == 5:
         cmd_fleet_manager(*args)
     elif cmd == "values" and len(args) == 2:
