@@ -138,18 +138,40 @@ def cmd_bart(output_path, exit_code, margo_path):
     types = {p.get("type") for p in profiles_of(doc)}
     helm_only = types == {"helm"}
 
-    # The single tolerated failure: bart 0.4.x always reads compose/compose.yaml,
-    # which a helm-only app does not have. Every other failure counts.
+    # Tolerated failure 1: bart always reads compose/compose.yaml, which a
+    # helm-only app does not have.
     missing_compose = re.compile(r"^compose/compose\.yaml - \./compose/compose\.yaml: No such file or directory")
     tolerated = [f for f in failed if helm_only and missing_compose.match(f)]
+    # Tolerated failure 2: bart's "parameters -> compose ${env}" ignores the
+    # components of a target and expects every pointer of every profile in
+    # compose.yaml. A pointer of a target that names only helm components is
+    # a Helm value path and never a compose variable. The failure is
+    # tolerated only when every pointer it lists is such a helm-only pointer;
+    # the compose targets are checked by `compose` (scripts/check.sh).
+    not_interpolated = re.compile(r"^parameters -> compose \$\{env\} - Parameter target\(s\) never interpolated in compose: (.+)$")
+    helm = set(components_of(doc, "helm"))
+    helm_pointers, compose_pointers = set(), set()
+    for param in (doc.get("parameters") or {}).values():
+        for target in (param or {}).get("targets") or []:
+            comps = set(target.get("components") or [])
+            (helm_pointers if comps and comps <= helm else compose_pointers).add(target.get("pointer"))
+    scoped = []
+    for f in failed:
+        m = not_interpolated.match(f)
+        if m and f not in tolerated:
+            listed = {x.strip() for x in m.group(1).split(",") if x.strip()}
+            if listed and listed <= helm_pointers - compose_pointers:
+                scoped.append(f)
+                ok(f"bart: 'parameters -> compose ${{env}}' lists only the {len(listed)} pointers of "
+                   f"helm-only targets (bart ignores Target.components); tolerated")
+    tolerated += scoped
     other = [f for f in failed if f not in tolerated]
     for f in other:
         fail(f"bart: {f}")
     if exit_code == "0":
         ok("bart validate exited 0")
     elif tolerated and not other:
-        ok("bart validate: the only failure is the missing compose/compose.yaml, "
-           "which does not apply to a helm-only app")
+        ok("bart validate: every failure is a tolerated one (see above and README.md \"Validation\")")
     elif not other:
         fail(f"bart validate exited {exit_code} without a reported check failure")
 
