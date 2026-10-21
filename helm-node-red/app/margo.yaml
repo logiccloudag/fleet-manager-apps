@@ -3,11 +3,12 @@ kind: ApplicationDescription
 id: node-red
 metadata:
   name: Node-RED
-  version: "1.0.0"
+  version: "1.1.0"
   description: >-
     Node-RED 4 low-code flow editor for wiring devices, APIs and services,
     installed from the upstream schwarzit Helm chart. Runs under Pod Security
     "restricted" with namespace-scoped resources only.
+    A compose profile runs the same image with Docker Compose.
   catalog:
     organization:
       - name: logiccloud
@@ -40,6 +41,25 @@ deploymentProfiles:
           - arm64
       memory: 512Mi
       storage: 5Gi
+  - type: compose
+    id: compose
+    components:
+      - name: node-red-compose
+        properties:
+          # The compose package built from helm-node-red/compose
+          # (scripts/publish-compose.sh).
+          repository: oci://ghcr.io/logiccloudag/margo-compose/node-red
+          revision: "1.0.0"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.5
+        architectures:
+          - amd64
+          - arm64
+      memory: 512Mi
+      storage: 5Gi
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. Helm treats every
 # non-empty string as true, so a chart boolean that defaults to true can only
@@ -48,7 +68,30 @@ deploymentProfiles:
 # `configuration`: do not override them. The chart's own defaults already
 # pass Pod Security "restricted" (non-root UID 1000, seccomp RuntimeDefault,
 # no privilege escalation, all capabilities dropped).
+# A target of a *-compose component names an environment variable of
+# compose/compose.yaml instead (Margo Target.pointer for compose); its
+# default there equals the value here. Parameters without such a target
+# (for example sizes, resources and the fixed ones) apply to the Helm
+# profile only.
 parameters:
+  # Fixed: the copy of docker.io/nodered/node-red in the catalog's image
+  # registry (scripts/images.tsv). The chart has no digest field, so the tag
+  # carries the multi-arch index digest.
+  imageRegistry:
+    value: "ghcr.io"
+    targets:
+      - pointer: image.registry
+        components: [node-red]
+  imageRepository:
+    value: "logiccloudag/margo-images/node-red"
+    targets:
+      - pointer: image.repository
+        components: [node-red]
+  imageTag:
+    value: "4.1.2@sha256:216e7403aab9888f7e68de9e468fed31bb9d7b2d38117c08e645095a63658a2f"
+    targets:
+      - pointer: image.tag
+        components: [node-red]
   # Fixed: the agent's Role cannot create Role or RoleBinding objects. The
   # chart's Role serves only the (disabled) flow-refresh sidecar.
   rbacEnabled:
@@ -73,6 +116,8 @@ parameters:
     targets:
       - pointer: service.port
         components: [node-red]
+      - pointer: NODE_RED_PORT
+        components: [node-red-compose]
   cpuRequest:
     value: "100m"
     targets:

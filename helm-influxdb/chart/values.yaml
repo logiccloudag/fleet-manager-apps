@@ -8,9 +8,12 @@
 # organisation, sizes, resources) are Margo parameters.
 influxdb2:
   image:
-    repository: influxdb
+    # The copy of docker.io/library/influxdb in the catalog's image registry
+    # (scripts/images.tsv). The upstream chart has no digest field, so the
+    # tag carries the multi-arch index digest.
+    repository: ghcr.io/logiccloudag/margo-images/influxdb
     # The upstream chart pins 2.7.4 (2023-12); 2.9.1 is the current 2.x release.
-    tag: 2.9.1-alpine
+    tag: 2.9.1-alpine@sha256:f551adeb94b6f97626d2043ec90ed17f81de18d15bb5412d2101e0965c93c797
   # Container security context: Pod Security "restricted". The upstream
   # chart renders this map with toYaml and derives the pod's fsGroup from
   # runAsGroup. UID/GID 1000 is the image's own influxdb user.

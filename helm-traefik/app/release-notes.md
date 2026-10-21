@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.1.0
+
+- The image now comes from `ghcr.io/logiccloudag/margo-images/traefik:v3.7.14`, a copy of `docker.io/library/traefik:v3.7.14` with the same multi-arch digest, pulled by digest. Devices no longer need a `docker.io` mirror. Chart: traefik-restricted 0.2.0.
+
 ## 1.0.1
 
 - `webNodePort` and `ingressClass` may now be left empty, as their

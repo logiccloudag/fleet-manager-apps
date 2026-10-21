@@ -3,12 +3,13 @@ kind: ApplicationDescription
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.0.1"
+  version: "1.1.0"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
     around the unchanged upstream influxdata/influxdb2 chart that adds the
     typed Pod Security "restricted" settings the upstream chart lacks.
+    A compose profile runs the same image with Docker Compose.
   catalog:
     organization:
       - name: logiccloud
@@ -31,7 +32,26 @@ deploymentProfiles:
           # The wrapper chart in helm-influxdb/chart (it vendors the
           # unchanged influxdata/influxdb2 2.1.2 chart as a dependency).
           repository: oci://ghcr.io/logiccloudag/margo-charts/influxdb2-restricted
-          revision: "0.1.0"
+          revision: "0.2.0"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.5
+        architectures:
+          - amd64
+          - arm64
+      memory: 1Gi
+      storage: 8Gi
+  - type: compose
+    id: compose
+    components:
+      - name: influxdb-compose
+        properties:
+          # The compose package built from helm-influxdb/compose
+          # (scripts/publish-compose.sh).
+          repository: oci://ghcr.io/logiccloudag/margo-compose/influxdb
+          revision: "1.0.0"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -49,12 +69,19 @@ deploymentProfiles:
 # are values of the wrapper chart, because a string cannot express them.
 # The pointers start with "influxdb2." because the upstream chart is a
 # dependency of the wrapper.
+# A target of a *-compose component names an environment variable of
+# compose/compose.yaml instead (Margo Target.pointer for compose); its
+# default there equals the value here. Parameters without such a target
+# (for example sizes, resources and the fixed ones) apply to the Helm
+# profile only.
 parameters:
   adminUser:
     value: "admin"
     targets:
       - pointer: influxdb2.adminUser.user
         components: [influxdb]
+      - pointer: DOCKER_INFLUXDB_INIT_USERNAME
+        components: [influxdb-compose]
   # Empty: the chart generates a random password and keeps it in the Secret
   # <release>-influxdb2-auth (key admin-password) across upgrades.
   adminPassword:
@@ -62,12 +89,16 @@ parameters:
     targets:
       - pointer: influxdb2.adminUser.password
         components: [influxdb]
+      - pointer: DOCKER_INFLUXDB_INIT_PASSWORD
+        components: [influxdb-compose]
   # Empty: the chart generates a random operator token (key admin-token).
   adminToken:
     value: ""
     targets:
       - pointer: influxdb2.adminUser.token
         components: [influxdb]
+      - pointer: DOCKER_INFLUXDB_INIT_ADMIN_TOKEN
+        components: [influxdb-compose]
   # Name of an existing Secret in the agent's namespace with the keys
   # admin-password and admin-token. Replaces the generated Secret when set.
   adminExistingSecret:
@@ -80,22 +111,30 @@ parameters:
     targets:
       - pointer: influxdb2.adminUser.organization
         components: [influxdb]
+      - pointer: DOCKER_INFLUXDB_INIT_ORG
+        components: [influxdb-compose]
   bucket:
     value: "default"
     targets:
       - pointer: influxdb2.adminUser.bucket
         components: [influxdb]
+      - pointer: DOCKER_INFLUXDB_INIT_BUCKET
+        components: [influxdb-compose]
   # Retention of the initial bucket, for example 720h; 0s keeps data forever.
   retention:
     value: "0s"
     targets:
       - pointer: influxdb2.adminUser.retention_policy
         components: [influxdb]
+      - pointer: DOCKER_INFLUXDB_INIT_RETENTION
+        components: [influxdb-compose]
   servicePort:
     value: "8086"
     targets:
       - pointer: influxdb2.service.port
         components: [influxdb]
+      - pointer: INFLUXDB_PORT
+        components: [influxdb-compose]
   persistenceSize:
     value: "8Gi"
     targets:
@@ -133,7 +172,7 @@ configuration:
           schema: optionalText
           immutable: true
         - parameter: adminExistingSecret
-          name: Existing Secret with admin-password and admin-token
+          name: Existing Secret with admin-password and admin-token (Kubernetes)
           schema: optionalText
           immutable: true
         - parameter: organization

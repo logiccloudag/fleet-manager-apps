@@ -1,14 +1,20 @@
 # fleet-manager-apps
 
-A catalog of Margo applications for fleet-manager. Each app is a Helm-based
-Margo `ApplicationDescription`. Devices running the
-[kubernetes-agent](https://logiccloud.youtrack.cloud/projects/KA) install the apps.
+A catalog of Margo applications for fleet-manager. Each app is a Margo
+`ApplicationDescription` with a Helm profile, which devices running the
+[kubernetes-agent](https://logiccloud.youtrack.cloud/projects/KA) install.
+Grafana, InfluxDB, Mosquitto and Node-RED also have a compose profile for
+devices that run Docker Compose (see "Compose profile").
 
 fleet-manager reads this repository as a **Git registry**: in the UI open
 `/<tenant>/repositories/git-registries` (NBI `POST /api/v1/registries/git`).
 The sync imports every `*.yaml` file whose `kind` is `ApplicationDescription`.
-The file name does not matter. fleet-manager never pulls a chart: the agent
-on the device pulls it from the OCI reference in the description.
+The file name does not matter. fleet-manager never pulls a chart or a
+compose package: the device pulls it from the OCI reference in the
+description.
+
+Every package and image is public on ghcr.io and published from `main` by
+GitHub Actions (see "Publishing"). The design is ADR FM-A-202.
 
 ## Layout
 
@@ -17,29 +23,55 @@ helm-<app>/
   app/margo.yaml          the ApplicationDescription (bart layout)
   app/icon.png            catalog icon (256 px)
   app/release-notes.md    catalog release notes
+  compose/compose.yaml    the compose package (four apps; bart layout)
 helm-influxdb/chart/      the influxdb2-restricted wrapper chart (see below)
 helm-mosquitto/chart/     the mosquitto-restricted chart (see below)
 helm-traefik/chart/       the traefik-restricted chart (see below)
 scripts/charts.tsv        pinned chart per app: name, version, source, sha256
-scripts/check.sh          all checks (bart, fleet-manager rules, render, cluster)
-scripts/mirror-charts.sh  publishes the pinned charts to the mirror registry
-scripts/lib/              helpers of the two scripts
+scripts/images.tsv        pinned image: name, upstream, tag, digest, apps
+scripts/check.sh          all checks (bart, fleet-manager rules, render,
+                          compose, cluster, compose smoke)
+scripts/mirror-images.sh  copies the pinned images to margo-images
+scripts/mirror-charts.sh  publishes the pinned charts to margo-charts
+scripts/publish-compose.sh  publishes the compose packages to margo-compose
+scripts/verify-public.sh  checks that everything pulls without credentials
+scripts/retention.sh      deletes old package versions
+scripts/lib/              helpers of the scripts
+scripts/ci/               tool installer and kind setup of the workflows
+.github/workflows/        check, publish, retention
 ```
 
 Each app has its own directory. Each description has one `helm` deployment
-profile with one component, whose chart lives at
+profile (`id: kubernetes`) with one component, whose chart lives at
 `oci://ghcr.io/logiccloudag/margo-charts/<chart>` (public, no credentials).
-`revision` is the chart version.
+`revision` is the chart version. An app with a compose profile
+(`id: compose`) has one more component, `<app>-compose`, whose package lives
+at `oci://ghcr.io/logiccloudag/margo-compose/<app>`; its `revision` is the
+compose package version.
+
+Every image is a copy of the official upstream image at
+`ghcr.io/logiccloudag/margo-images/<name>:<tag>`, made by `crane copy`, which
+keeps the upstream multi-arch index digest. Charts and compose files
+reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 
 ## Apps
 
 | App (`id`) | Chart in `margo-charts` | Upstream chart | Chart license | Application and image | Type |
 | --- | --- | --- | --- | --- | --- |
-| `grafana` | `grafana` 13.2.7 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.2.7 | Apache-2.0 | Grafana 13.2.3, `docker.io/grafana/grafana:13.2.3-distroless` (AGPL-3.0) | mirror |
-| `influxdb` | `influxdb2-restricted` 0.1.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
-| `mosquitto` | `mosquitto-restricted` 0.1.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, `docker.io/library/eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f…` (EPL-2.0/EDL-1.0) | local |
-| `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
-| `traefik` | `traefik-restricted` 0.1.0 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.14, `docker.io/library/traefik:v3.7.14@sha256:575fa15b…` (MIT) | local |
+| `grafana` | `grafana` 13.2.7 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.2.7 | Apache-2.0 | Grafana 13.2.3, copy of `docker.io/grafana/grafana:13.2.3-distroless` (AGPL-3.0) | mirror |
+| `influxdb` | `influxdb2-restricted` 0.2.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
+| `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
+| `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
+| `traefik` | `traefik-restricted` 0.2.0 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.14, copy of `docker.io/library/traefik:v3.7.14` (MIT) | local |
+
+The compose package of `grafana`, `influxdb`, `mosquitto` and `node-red` is
+version 1.0.0. Traefik has no compose profile: it is a Kubernetes ingress
+controller.
+
+A mirror chart cannot be changed, so its image is set by fixed parameters
+(Grafana: `image.registry`, `image.repository`, `image.tag`, `image.sha`;
+Node-RED has no digest field, so `image.tag` is `<tag>@<digest>`). The
+wrapper and local charts set it in their `values.yaml`.
 
 - **mirror**: `scripts/mirror-charts.sh` pushes the upstream `.tgz`
   unchanged. Its SHA-256 is pinned in `scripts/charts.tsv`.
@@ -122,6 +154,64 @@ Every image is an official upstream image. No Bitnami chart or image is used.
   - `pdb.create: false`;
   - the 2.9.1 image (the upstream default is 2.7.4).
 
+## Compose profile
+
+The package format is the "Compose Component Registry" of the Margo
+specification (pre-draft, margo/specification PR #200, the same document
+fleet-manager follows for `repository` and `revision`, ADR-0010-1):
+
+- an OCI artifact with `artifactType`
+  `application/vnd.org.margo.component.compose+json`;
+- one layer, `application/vnd.org.margo.component.compose.tar+gzip`: a
+  `.tar.gz` of `helm-<app>/compose/` under one top-level directory named
+  after the component, holding `compose.yaml`;
+- the layer annotations `org.margo.component.type=compose` and
+  `org.margo.component.version=<revision>`, plus
+  `org.opencontainers.image.*`. The layer title is the archive file name,
+  which `oras pull` needs.
+
+`scripts/publish-compose.sh` builds the archive deterministically (sorted
+entries, owner 0, mtime 0), so the same files always give the same digest.
+Never use `docker compose publish`: the spec forbids its format.
+
+Rules of this catalog for `compose.yaml` (`scripts/check.sh` enforces them):
+
+- images only, each `ghcr.io/logiccloudag/margo-images/<name>:<tag>@<digest>`
+  pinned in `scripts/images.tsv`;
+- no bind mounts, no secrets, no `build`, no host network, PID or IPC, no
+  devices, no top-level `name` (the device names the project);
+- `cap_drop: [ALL]` and `no-new-privileges:true` on every service, no
+  `cap_add`; each service runs as the image's non-root user.
+
+**Parameters.** A target of the `<app>-compose` component names an
+environment variable (Margo `Target.pointer` for compose). The spec does not
+say whether the device sets that variable in the container environment or
+uses it for `${VAR}` interpolation in `compose.yaml` (recorded on FM-1630).
+So every variable is written `${VAR:-<parameter value>}`, and where the
+container reads it, the environment entry has the same name:
+`FOO: ${FOO:-default}`. Both readings then give the same result. Host port
+variables (`GRAFANA_PORT`, ...) only work through interpolation.
+`scripts/check.sh` fails on a `${VAR}` without a compose target, on a target
+that `compose.yaml` does not use, and on a default that differs from the
+parameter value. Parameters without a compose target (sizes, resources,
+the fixed ones) apply to the Helm profile only; settings that apply to one
+profile only say so in their name.
+
+Per app:
+
+- **Grafana.** An empty administrator password means Grafana's default
+  `admin`, which Grafana asks to change at the first login.
+- **InfluxDB.** Runs as UID 1000. The `DOCKER_INFLUXDB_INIT_*` values apply
+  on the first start with an empty volume only. An empty administrator
+  password is generated then and stored, readable only by the influxdb user,
+  in `/etc/influxdb2/generated-admin-password`; it is never logged.
+- **Mosquitto.** Runs as UID 1883 with a read-only root file system. The
+  configuration is written at start from the variables. A compose package
+  carries no Secret, so the compose-only settings user name and password
+  create a password file with one user in memory.
+- **Node-RED.** The image's health check gates `docker compose up --wait`.
+  The editor has no login: publish its port only on a trusted network.
+
 ## kubernetes-agent constraints
 
 Every app here must meet these constraints. `scripts/check.sh` enforces
@@ -183,9 +273,9 @@ constraints 1 to 7; `--cluster` also exercises 8 on the test cluster.
    Each volume size is a parameter. No pod may be pinned away from an
    architecture listed in `requiredResources.cpu.architectures` (amd64 and
    arm64 here).
-8. **Images.** The device must be able to pull the images. On clusters whose
-   `docker.io` mirror is the logiccloud ACR (`logiccloud.azurecr.io/mirror/docker.io/...`),
-   the images above must be imported into that mirror first.
+8. **Images.** The device must be able to pull the images. They are public
+   copies on `ghcr.io/logiccloudag/margo-images`, pulled by digest, so no
+   `docker.io` mirror and no credentials are needed.
 
 Release names are `<component>-<hash>`, set by the agent. Removing a
 deployment uninstalls the release. The InfluxDB data PVC survives the
@@ -213,23 +303,26 @@ Run all checks:
 scripts/check.sh                       # every app
 scripts/check.sh helm-grafana          # one app
 scripts/check.sh --cluster             # plus the cluster stage (see below)
+scripts/check.sh --compose             # plus the compose smoke test (see below)
 CHART_SOURCE=mirror scripts/check.sh   # check the published charts instead of upstream
 ```
 
-Requirements: `docker`, `helm` (3.14+ or 4), `python3` with PyYAML; `kubectl`
-for `--cluster`; `kubeconform` (optional, recommended).
+Requirements: `docker` with `docker compose`, `helm` (3.14+ or 4), `python3`
+with PyYAML; `kubectl` for `--cluster`; `kubeconform` (optional,
+recommended). The `check` workflow runs everything on a kind cluster.
 
 The script prints every finding and a summary table. It exits non-zero
 on any failure. The stages for each app are:
 
 1. **bart validate.** The script runs FLECS bart
-   (`cr.flecs.tech/flecs/bart:latest`) unchanged against the app directory:
+   (`BART_IMAGE`, default `cr.flecs.tech/flecs/bart:latest`; CI pins it by
+   digest) unchanged against the app directory:
    - the Margo JSON Schema check of `app/margo.yaml`;
-   - icon, release notes and CPU architectures.
+   - icon, release notes and CPU architectures;
+   - the compose lints of `compose/compose.yaml`.
 
-   bart 0.4.x always reads `compose/compose.yaml`, also for a `type: helm`
-   profile. It has no option to skip that, and `package` and `push` are
-   compose-only. A helm-only app therefore always gets exactly one bart
+   bart always reads `compose/compose.yaml`, also for a `type: helm`
+   profile. A helm-only app (Traefik) therefore always gets exactly one bart
    failure: `compose/compose.yaml - ./compose/compose.yaml: No such file or
    directory`. The script tolerates that one failure, and only when every
    profile is `helm`. Any other failure, including the schema check, fails
@@ -254,12 +347,18 @@ on any failure. The stages for each app are:
 2. **fleet-manager rules.** These are the ingest rules of
    `margo-manifest-parser.service.ts`:
    - top-level `id`, `kind`, `metadata.name`, `version` and `catalog`;
-   - profile `type: helm`, `oci://` repository, SemVer revision;
+   - profile `type: helm` or `compose`, `oci://` repository, SemVer
+     revision;
    - parameter keys, and parameters with targets.
 
    This catalog adds its own rules:
-   - the repository is `oci://ghcr.io/logiccloudag/margo-charts/<chart>`;
-   - the revision equals the pin;
+   - exactly one helm profile and at most one compose profile, with one
+     component each;
+   - the helm repository is `oci://ghcr.io/logiccloudag/margo-charts/<chart>`
+     and its revision equals the pin;
+   - the compose repository is `oci://ghcr.io/logiccloudag/margo-compose/<id>`;
+   - a helm target `pointer` is a dot path, a compose target `pointer` an
+     environment variable name;
    - every value is a quoted string;
    - icon and release notes exist;
    - the parameters resolve without a conflict.
@@ -274,7 +373,10 @@ on any failure. The stages for each app are:
       agent's Role can create.
    4. A static Pod Security `restricted` check runs on every pod template, and
       no pod may be pinned away from a declared CPU architecture.
-   5. `kubeconform -strict` runs, which catches a string where the API
+   5. Every container image is a pinned copy,
+      `ghcr.io/logiccloudag/margo-images/<name>:<tag>@<digest>` of a row of
+      `scripts/images.tsv` for the app.
+   6. `kubeconform -strict` runs, which catches a string where the API
       expects a number or a boolean.
 5. **Cluster (`--cluster`).** The stage runs on the current `kubectl` context
    (`KUBECONFIG`):
@@ -291,6 +393,21 @@ on any failure. The stages for each app are:
 
    Never point `CHECK_NAMESPACE` at a namespace in use: the script refuses an
    existing namespace.
+
+   The `check` workflow points the kind nodes' `ghcr.io` pulls at a local
+   registry that `scripts/mirror-images.sh` fills with the same digests
+   (`scripts/ci/kind-with-mirror.sh`), so the stage pulls the exact
+   references before they are published.
+6. **Compose package** (apps with a compose profile). The package is built
+   as for publishing and checked: the archive layout (one top-level
+   directory, `compose.yaml`, no links, no absolute or `../` paths, no
+   setuid bits), the rules and parameters of "Compose profile", and
+   `docker compose config` with the parameter defaults.
+7. **Compose smoke (`--compose`).** `docker compose up --wait` with the
+   parameter defaults (`COMPOSE_WAIT_TIMEOUT`, default 300 s). Every
+   container must be running, and healthy where it has a health check. Then
+   `docker compose down -v`. `SMOKE_IMAGE_REGISTRY` pulls the images from
+   another registry with the same digests (the workflow's local registry).
 
 ## Bumping a chart
 
@@ -318,33 +435,85 @@ on any failure. The stages for each app are:
    3. Bump the wrapper's own `version`.
    4. Put the dependency's SHA-256 and the wrapper version in
       `scripts/charts.tsv`.
-4. Validate with `scripts/check.sh <app>` and with `scripts/check.sh --cluster
-   <app>` on a test cluster.
-5. Publish with `scripts/mirror-charts.sh <app>` (see below), then commit.
-   A published version is never overwritten: a change needs a new version.
+4. Validate with `scripts/check.sh <app>`, and with `scripts/check.sh
+   --cluster --compose <app>` on a test cluster (the `check` workflow runs
+   both on every pull request).
+5. Merge to `main`: the `publish` workflow publishes the chart. A published
+   version is never overwritten: a change needs a new version.
+
+## Bumping an image
+
+1. Pick the new upstream tag and read its multi-arch index digest:
+   `crane digest docker.io/<upstream>:<tag>`.
+2. In `scripts/images.tsv`, set `tag` and `digest`.
+3. Change every reference to `ghcr.io/logiccloudag/margo-images/<name>:<tag>@<digest>`:
+   - a mirror chart: the fixed image parameters in `app/margo.yaml`;
+   - a wrapper or local chart: `values.yaml`, and bump the chart `version`
+     (in `Chart.yaml`, `scripts/charts.tsv` and `revision`);
+   - `compose/compose.yaml`, and bump the compose `revision`.
+4. Bump `metadata.version` and add release notes. `scripts/check.sh` fails
+   on any reference that does not match `scripts/images.tsv`.
+
+## Changing a compose package
+
+Any change under `helm-<app>/compose/` needs a new compose `revision` in
+`app/margo.yaml` (minor for a feature, patch for a fix), a new
+`metadata.version` and release notes. Publishing a changed package under an
+existing revision fails.
 
 ## Publishing
 
-`scripts/mirror-charts.sh [--dry-run] [app...]` pulls each pinned chart and
-checks its SHA-256. It then pushes the chart to `MIRROR_REGISTRY`
-(default `oci://ghcr.io/logiccloudag/margo-charts`) and pulls it back to
-compare. A mirror chart is pushed byte-identical. A version that already
-exists is skipped when its content is identical, and is an error otherwise.
+The `publish` workflow (`.github/workflows/publish.yml`) runs on every push
+to `main`. It runs the `check` workflow first, then, with the built-in
+`GITHUB_TOKEN` (`packages: write`):
 
-1. Grant the scope and log in:
+1. `scripts/mirror-images.sh` copies the pinned images to
+   `ghcr.io/logiccloudag/margo-images`;
+2. `scripts/mirror-charts.sh` publishes the pinned charts to
+   `oci://ghcr.io/logiccloudag/margo-charts`;
+3. `scripts/publish-compose.sh` publishes the compose packages to
+   `ghcr.io/logiccloudag/margo-compose`;
+4. `scripts/verify-public.sh` pulls everything without credentials.
 
-   ```sh
-   gh auth refresh -s write:packages,read:packages
-   gh auth token | helm registry login ghcr.io -u <github-user> --password-stdin
-   ```
+Each script skips a version that already exists with the same content and
+fails (`ERROR:`) when it exists with different content. Each has
+`--dry-run`. A mirror chart is pushed byte-identical, an image keeps its
+upstream digest, and a compose archive is built deterministically, so a
+rerun publishes nothing new.
 
-2. Run `scripts/mirror-charts.sh --dry-run`, then `scripts/mirror-charts.sh`.
-3. New ghcr.io packages are private. For each package, open
-   `https://github.com/orgs/logiccloudag/packages/container/margo-charts%2F<chart>/settings`,
-   go to "Danger Zone", choose "Change visibility" and select **Public**.
-4. Log out (`helm registry logout ghcr.io`). Verify each package anonymously:
+**Once, by a human (an organisation owner):**
 
-   ```sh
-   helm pull oci://ghcr.io/logiccloudag/margo-charts/grafana --version 13.2.7
-   CHART_SOURCE=mirror scripts/check.sh
-   ```
+1. The `margo-charts/*` packages were first pushed by hand, so the
+   workflow's token cannot write to them. For each one, open the package
+   settings, "Manage Actions access", add `fleet-manager-apps` with the role
+   **Admin** (Admin also lets `retention` delete old versions). Packages
+   that the workflow creates are linked to the repository automatically.
+2. New ghcr.io packages are private. After the first run, for each new
+   `margo-images/*`, `margo-charts/*` and `margo-compose/*` package, open
+   `https://github.com/orgs/logiccloudag/packages/container/<package>/settings`
+   (the name with `/` encoded as `%2F`), go to "Danger Zone", choose
+   "Change visibility" and select **Public**. Until then `verify-public`
+   fails and lists the private packages; rerun it afterwards.
+
+**Retention.** The `retention` workflow (weekly, or by hand with `delete`)
+runs `scripts/retention.sh`. It keeps the 5 newest tagged versions of each
+package, every version that `main` pins, and every untagged version (the
+platform manifests of a multi-arch image are untagged children of its
+index). Without `--delete` the script prints its plan only.
+
+**By hand.** The scripts also run locally. Log in with a token that has
+`write:packages`:
+
+```sh
+gh auth refresh -s write:packages,read:packages
+gh auth token | crane auth login ghcr.io -u <github-user> --password-stdin
+gh auth token | helm registry login ghcr.io -u <github-user> --password-stdin
+gh auth token | oras login ghcr.io -u <github-user> --password-stdin
+scripts/mirror-images.sh --dry-run && scripts/mirror-images.sh
+scripts/mirror-charts.sh --dry-run && scripts/mirror-charts.sh
+scripts/publish-compose.sh --dry-run && scripts/publish-compose.sh
+```
+
+For a local test registry, `crane registry serve --address 127.0.0.1:5001`
+works with `IMAGE_REGISTRY`, `MIRROR_REGISTRY` and `COMPOSE_REGISTRY` set to
+it, plus `CRANE_INSECURE=1`, `MIRROR_PLAIN_HTTP=1` and `ORAS_PLAIN_HTTP=1`.

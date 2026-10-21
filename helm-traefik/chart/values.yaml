@@ -4,10 +4,12 @@
 # are fixed in the templates and are not values.
 
 image:
-  repository: docker.io/library/traefik
+  # The copy of docker.io/library/traefik in the catalog's image registry
+  # (scripts/images.tsv).
+  repository: ghcr.io/logiccloudag/margo-images/traefik
   tag: v3.7.14
-  # Multi-arch index digest of v3.7.14 (amd64, arm64, arm, ...). When set,
-  # the image is pulled by digest.
+  # Multi-arch index digest of v3.7.14 (amd64, arm64, arm, ...), the same as
+  # upstream. When set, the image is pulled by digest.
   digest: sha256:575fa15b135078fe5e50aa847987d96dbddd7b093c172429618404df73f3fa7c
   pullPolicy: IfNotPresent
 

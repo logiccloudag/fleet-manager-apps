@@ -7,7 +7,7 @@ description: >-
   reach the agent as strings only, so these values cannot be set through
   parameters (see the repository README, "Why InfluxDB is wrapped").
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "2.9.1"
 home: https://github.com/logiccloudag/fleet-manager-apps
 sources:

@@ -1,0 +1,52 @@
+# Weekly cleanup of old package versions on ghcr.io (scripts/retention.sh):
+# keeps the 5 newest tagged versions of each package, every version main
+# pins, and every untagged version (platform manifests of multi-arch images).
+name: retention
+
+on:
+  schedule:
+    - cron: "30 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      delete:
+        description: Delete (otherwise only print the plan)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  retention:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install PyYAML
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet "pyyaml==6.0.3"
+          echo "$RUNNER_TEMP/venv/bin" >>"$GITHUB_PATH"
+
+      - name: scripts/retention.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DELETE: ${{ github.event_name == 'schedule' || inputs.delete }}
+        run: |
+          set -euo pipefail
+          if [ "$DELETE" = true ]; then
+            scripts/retention.sh --delete
+          else
+            scripts/retention.sh
+          fi

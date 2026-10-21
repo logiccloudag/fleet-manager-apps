@@ -1,0 +1,31 @@
+# Compose package of the Grafana app: the component grafana-compose of the
+# compose deployment profile in app/margo.yaml.
+#
+# Each Margo parameter of this profile targets an environment variable
+# (Target.pointer). The Margo spec does not say whether the device sets the
+# variable in the container environment or uses it for ${VAR} interpolation
+# here, so each variable has the same name in both places and its default
+# here equals the parameter value in app/margo.yaml (scripts/check.sh checks
+# that). GRAFANA_PORT only works through interpolation.
+services:
+  grafana:
+    image: ghcr.io/logiccloudag/margo-images/grafana:13.2.3-distroless@sha256:202e5d5b3f8499e70ccac7991eea6d7da72d2790eb2e0597e7987acf724e7180
+    restart: unless-stopped
+    # The image runs as its own user grafana (UID 472) and needs no
+    # capability.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${GRAFANA_PORT:-80}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      # Empty: Grafana's default password "admin", which Grafana asks to
+      # change at the first login.
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-}
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  grafana-data:

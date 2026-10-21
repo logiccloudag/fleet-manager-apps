@@ -3,13 +3,14 @@ kind: ApplicationDescription
 id: grafana
 metadata:
   name: Grafana
-  version: "1.0.2"
+  version: "1.1.0"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
     "restricted" with namespace-scoped resources only. Requires Kubernetes
     1.25 or later (the chart declares kubeVersion ^1.25.0-0); it does not
     install on older clusters such as MicroShift 4.8 (Kubernetes 1.21).
+    A compose profile runs the same image with Docker Compose.
   catalog:
     organization:
       - name: logiccloud
@@ -42,6 +43,25 @@ deploymentProfiles:
           - arm64
       memory: 512Mi
       storage: 5Gi
+  - type: compose
+    id: compose
+    components:
+      - name: grafana-compose
+        properties:
+          # The compose package built from helm-grafana/compose
+          # (scripts/publish-compose.sh).
+          repository: oci://ghcr.io/logiccloudag/margo-compose/grafana
+          revision: "1.0.0"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.5
+        architectures:
+          - amd64
+          - arm64
+      memory: 512Mi
+      storage: 5Gi
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. Helm treats every
 # non-empty string as true, so a chart boolean that defaults to true can only
@@ -49,7 +69,35 @@ deploymentProfiles:
 # the chart pass Pod Security "restricted" and stay inside the agent's
 # namespace-scoped Role. They are not listed in `configuration`: do not
 # override them.
+# A target of a *-compose component names an environment variable of
+# compose/compose.yaml instead (Margo Target.pointer for compose); its
+# default there equals the value here. Parameters without such a target
+# (for example sizes, resources and the fixed ones) apply to the Helm
+# profile only.
 parameters:
+  # Fixed: the copy of docker.io/grafana/grafana in the catalog's image
+  # registry, pulled by its multi-arch index digest (scripts/images.tsv).
+  imageRegistry:
+    value: "ghcr.io"
+    targets:
+      - pointer: image.registry
+        components: [grafana]
+  imageRepository:
+    value: "logiccloudag/margo-images/grafana"
+    targets:
+      - pointer: image.repository
+        components: [grafana]
+  imageTag:
+    value: "13.2.3-distroless"
+    targets:
+      - pointer: image.tag
+        components: [grafana]
+  # The chart prefixes "sha256:" itself.
+  imageSha:
+    value: "202e5d5b3f8499e70ccac7991eea6d7da72d2790eb2e0597e7987acf724e7180"
+    targets:
+      - pointer: image.sha
+        components: [grafana]
   # Fixed: the agent's Role cannot create Role, RoleBinding or ClusterRole
   # objects. Grafana needs RBAC only for its (disabled) sidecars.
   rbacCreate:
@@ -94,11 +142,15 @@ parameters:
     targets:
       - pointer: service.port
         components: [grafana]
+      - pointer: GRAFANA_PORT
+        components: [grafana-compose]
   adminUser:
     value: "admin"
     targets:
       - pointer: adminUser
         components: [grafana]
+      - pointer: GF_SECURITY_ADMIN_USER
+        components: [grafana-compose]
   # Empty: the chart generates a random password and keeps it in the Secret
   # <release>-grafana (key admin-password) across upgrades.
   adminPassword:
@@ -106,6 +158,8 @@ parameters:
     targets:
       - pointer: adminPassword
         components: [grafana]
+      - pointer: GF_SECURITY_ADMIN_PASSWORD
+        components: [grafana-compose]
   # Name of an existing Secret in the agent's namespace with the keys
   # admin-user and admin-password. Takes precedence over adminUser and
   # adminPassword when set.
@@ -137,10 +191,10 @@ configuration:
           name: Administrator user name
           schema: text
         - parameter: adminPassword
-          name: Administrator password (empty generates one)
+          name: Administrator password (empty generates one on Kubernetes, compose uses admin)
           schema: optionalText
         - parameter: adminExistingSecret
-          name: Existing Secret with admin-user and admin-password
+          name: Existing Secret with admin-user and admin-password (Kubernetes)
           schema: optionalText
     - name: Service and storage
       settings:
