@@ -5,10 +5,12 @@
 # templates and are not values.
 
 image:
-  repository: docker.io/library/eclipse-mosquitto
+  # The copy of docker.io/library/eclipse-mosquitto in the catalog's image
+  # registry (scripts/images.tsv).
+  repository: ghcr.io/logiccloudag/margo-images/eclipse-mosquitto
   tag: 2.1.2-alpine
-  # Multi-arch index digest of 2.1.2-alpine (amd64, arm64, ...). When set,
-  # the image is pulled by digest.
+  # Multi-arch index digest of 2.1.2-alpine (amd64, arm64, ...), the same as
+  # upstream. When set, the image is pulled by digest.
   digest: sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408
   pullPolicy: IfNotPresent
 

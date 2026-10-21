@@ -1,5 +1,10 @@
 # Release Notes
 
+## 2.1.0
+
+- New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/mosquitto` 1.0.0. The listener port, service port (the host port) and anonymous access apply to it. The new settings user name and password (compose only) create a password file with one user in memory; a compose package carries no Secret.
+- The image now comes from `ghcr.io/logiccloudag/margo-images/eclipse-mosquitto:2.1.2-alpine`, a copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` with the same multi-arch digest, pulled by digest. Devices no longer need a `docker.io` mirror. Chart: mosquitto-restricted 0.2.0.
+
 ## 2.0.1
 
 - `authExistingSecret` may now be left empty (no password file). fleet-manager showed it as required. The chart is unchanged.

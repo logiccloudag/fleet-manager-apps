@@ -1,0 +1,71 @@
+# Compose package of the Mosquitto app: the component mosquitto-compose of
+# the compose deployment profile in app/margo.yaml.
+#
+# Each Margo parameter of this profile targets an environment variable
+# (Target.pointer). The Margo spec does not say whether the device sets the
+# variable in the container environment or uses it for ${VAR} interpolation
+# here, so each variable has the same name in both places and its default
+# here equals the parameter value in app/margo.yaml (scripts/check.sh checks
+# that). MOSQUITTO_PORT only works through interpolation.
+#
+# The broker configuration is written at start from these variables, like
+# the ConfigMap of the Helm profile. A Margo compose package must not carry
+# file-source secrets, so instead of a password file from a Secret, the
+# optional MOSQUITTO_USERNAME and MOSQUITTO_PASSWORD create a password file
+# with one user in memory (tmpfs).
+services:
+  mosquitto:
+    image: ghcr.io/logiccloudag/margo-images/eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408
+    restart: unless-stopped
+    # The image's own user mosquitto, a read-only root file system and no
+    # capability, like the Helm profile. The listener port must be 1024 or
+    # higher.
+    user: "1883:1883"
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${MOSQUITTO_PORT:-1883}:${MOSQUITTO_LISTENER_PORT:-1883}"
+    environment:
+      MOSQUITTO_LISTENER_PORT: ${MOSQUITTO_LISTENER_PORT:-1883}
+      # "true" allows clients without credentials.
+      MOSQUITTO_ALLOW_ANONYMOUS: ${MOSQUITTO_ALLOW_ANONYMOUS:-false}
+      MOSQUITTO_USERNAME: ${MOSQUITTO_USERNAME:-}
+      MOSQUITTO_PASSWORD: ${MOSQUITTO_PASSWORD:-}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        conf=/tmp/mosquitto.conf
+        case "$${MOSQUITTO_ALLOW_ANONYMOUS}" in
+          true) anonymous=true ;;
+          *) anonymous=false ;;
+        esac
+        {
+          echo "listener $${MOSQUITTO_LISTENER_PORT}"
+          echo "allow_anonymous $${anonymous}"
+          echo "persistence true"
+          echo "persistence_location /mosquitto/data/"
+          echo "autosave_interval 300"
+          echo "log_dest stdout"
+        } >"$${conf}"
+        if [ -n "$${MOSQUITTO_USERNAME}" ]; then
+          if [ -z "$${MOSQUITTO_PASSWORD}" ]; then
+            echo "ERROR: MOSQUITTO_USERNAME is set, but MOSQUITTO_PASSWORD is empty" >&2
+            exit 1
+          fi
+          umask 077
+          mosquitto_passwd -c -b /tmp/passwd "$${MOSQUITTO_USERNAME}" "$${MOSQUITTO_PASSWORD}"
+          echo "password_file /tmp/passwd" >>"$${conf}"
+        fi
+        exec /usr/sbin/mosquitto -c "$${conf}"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+
+volumes:
+  mosquitto-data:

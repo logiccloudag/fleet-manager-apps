@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.1.0
+
+- New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/influxdb` 1.0.0. The initial setup settings and the service port (the host port) apply to it. An empty administrator password is generated at the first start and stored in `/etc/influxdb2/generated-admin-password` in the container.
+- The image now comes from `ghcr.io/logiccloudag/margo-images/influxdb:2.9.1-alpine`, a copy of `docker.io/library/influxdb:2.9.1-alpine` with the same multi-arch digest, pulled by digest. Devices no longer need a `docker.io` mirror. Chart: influxdb2-restricted 0.2.0.
+
 ## 1.0.1
 
 - `adminPassword`, `adminToken` and `adminExistingSecret` may now be left empty: the chart then generates a random password and operator token, and an empty Secret name keeps the generated Secret. fleet-manager showed them as required. The chart is unchanged.

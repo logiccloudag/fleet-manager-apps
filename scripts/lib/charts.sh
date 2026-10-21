@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
-# Shared helpers of scripts/check.sh and scripts/mirror-charts.sh: reading the
-# pin table scripts/charts.tsv and producing a verified chart archive.
+# Shared helpers of scripts/check.sh and the publish scripts: reading the pin
+# tables scripts/charts.tsv and scripts/images.tsv and producing a verified
+# chart archive.
 # Sourced, not executed. Written for bash 3.2 (macOS /bin/bash).
 
 # The variables below are used by the sourcing scripts.
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CHARTS_TSV="$REPO_ROOT/scripts/charts.tsv"
-# The registry the catalog points at. Overridable for a test registry.
+IMAGES_TSV="$REPO_ROOT/scripts/images.tsv"
+# The registries the catalog points at. Overridable for a test registry.
 MIRROR_REGISTRY="${MIRROR_REGISTRY:-oci://ghcr.io/logiccloudag/margo-charts}"
+# Images and compose packages: <host>/<path>, without a scheme.
+IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io/logiccloudag/margo-images}"
+COMPOSE_REGISTRY="${COMPOSE_REGISTRY:-ghcr.io/logiccloudag/margo-compose}"
 
 log() { echo "[$(basename "$0")] $*" >&2; }
 die() {
-  echo "[$(basename "$0")] error: $*" >&2
+  echo "[$(basename "$0")] ERROR: $*" >&2
   exit 1
 }
 
@@ -45,6 +50,19 @@ chart_rows() {
     [ -n "$found" ] || die "no row for app '$app' in $CHARTS_TSV"
     printf '%s\n' "$found"
   done
+}
+
+# image_rows [app...]: the image pin rows (tab separated) used by the named
+# apps, or all rows.
+image_rows() {
+  local app
+  if [ "$#" -eq 0 ]; then
+    grep -v '^#' "$IMAGES_TSV" | grep -v '^[[:space:]]*$'
+    return 0
+  fi
+  for app in "$@"; do
+    awk -F '\t' -v a="${app%/}" '!/^#/ && NF >= 5 { n = split($5, s, ","); for (i = 1; i <= n; i++) if (s[i] == a) print }' "$IMAGES_TSV"
+  done | sort -u
 }
 
 # verify_sha <file> <expected>: fails unless the file has the pinned digest.

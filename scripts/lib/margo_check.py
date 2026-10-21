@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Checks of one Margo Helm app, used by scripts/check.sh.
+"""Checks of one Margo app (a Helm profile and an optional compose profile),
+used by scripts/check.sh and scripts/publish-compose.sh.
 
 Subcommands (each prints one line per finding and exits 1 on any failure):
 
@@ -9,23 +10,40 @@ Subcommands (each prints one line per finding and exits 1 on any failure):
       Checks the validation rules of configuration.schema (allowEmpty,
       minLength, ...) against the Margo validation-schema subtypes and
       writes a copy without them for bart (see cmd_schema_rules).
-  fleet-manager <margo.yaml> <app-dir> <chart> <version> <registry>
+  fleet-manager <margo.yaml> <app-dir> <chart> <version> <chart-registry> <compose-registry>
       The ingest rules of fleet-manager's margo-manifest-parser.service.ts,
-      plus the rules of this catalog (helm-only, mirror repository, pins).
+      plus the rules of this catalog (one helm profile, at most one compose
+      profile, catalog repositories, pins).
+  components <margo.yaml> <type>
+      Prints the component names of the profiles of that type.
   values <margo.yaml> <out-dir>
       Resolves the parameter defaults to Helm values exactly like the
       kubernetes-agent (internal/reconcile/parameters.go) and writes
       <out-dir>/<component>.values.yaml. Prints the component names.
-  rendered <manifest.yaml> <margo.yaml>
-      Kinds, Pod Security "restricted" and CPU architecture checks of a
-      `helm template` output.
+  rendered <manifest.yaml> <margo.yaml> <images.tsv> <image-registry> <app-dir-name>
+      Kinds, Pod Security "restricted", CPU architecture and image checks of
+      a `helm template` output.
+  compose <margo.yaml> <app-dir> <images.tsv> <image-registry> <out-dir>
+      Builds the compose package of the compose profile as a deterministic
+      <out-dir>/<component>.tar.gz and checks it: the archive layout of the
+      Margo "Compose Component Registry", the compose file rules of this
+      catalog, the images, and that every ${VAR} matches a compose target
+      whose parameter value equals its default. Writes
+      <out-dir>/<component>.env (the parameter defaults) and, when
+      SMOKE_IMAGE_REGISTRY is set, <out-dir>/<component>.smoke.yaml (a
+      compose override that pulls the images from there). Prints
+      "<component> <repository> <revision>". Prints nothing for an app
+      without a compose profile.
 
 Requires Python 3.8+ and PyYAML.
 """
 
+import gzip
+import io
 import os
 import re
 import sys
+import tarfile
 
 import yaml
 
@@ -42,6 +60,13 @@ SEMVER_REVISION_PATTERN = re.compile(
 SEMVER_LOOSE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$")
 # bart's schema for components[].properties.timeout
 TIMEOUT_PATTERN = re.compile(r"^\d+m\d+s$")
+# A compose target pointer is an environment variable name.
+ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# ${VAR}, ${VAR:-default}, ${VAR-default}, ${VAR:?msg}, ${VAR?msg}; $${ is an
+# escaped dollar sign and not a variable.
+COMPOSE_VARIABLE = re.compile(r"(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-?+])([^}]*))?\}")
+COMPOSE_BARE_VARIABLE = re.compile(r"(?<!\$)\$([A-Za-z_][A-Za-z0-9_]*)")
+PROFILE_TYPES = ("helm", "compose")
 
 # kubernetes-agent internal/deploy/helm.go clusterScopedKinds
 CLUSTER_SCOPED_KINDS = {
@@ -196,7 +221,7 @@ def cmd_schema_rules(margo_path, out_path):
 
 # ------------------------------------------------------------ fleet-manager
 
-def cmd_fleet_manager(margo_path, app_dir, chart, version, registry):
+def cmd_fleet_manager(margo_path, app_dir, chart, version, registry, compose_registry):
     doc = load_yaml(margo_path)
     if not isinstance(doc, dict):
         fail("margo.yaml is not a YAML mapping")
@@ -249,12 +274,20 @@ def cmd_fleet_manager(margo_path, app_dir, chart, version, registry):
     component_names = set()
     seen_ids = set()
     expected_repository = f"{registry.rstrip('/')}/{chart}"
+    expected_compose_repository = f"{compose_registry.rstrip('/')}/{doc.get('id')}"
+    types = [p.get("type") for p in profiles]
+    if types.count("helm") != 1:
+        fail(f"expected exactly one helm profile, got {types.count('helm')}")
+    if types.count("compose") > 1:
+        fail(f"expected at most one compose profile, got {types.count('compose')}")
+    component_types = {}
     for i, profile in enumerate(profiles):
         path = f"deploymentProfiles[{i}]"
-        if profile.get("type") != "helm":
-            fail(f"{path}.type must be 'helm' (got {profile.get('type')!r}; 'helm.v3' is rejected)")
+        ptype = profile.get("type")
+        if ptype not in PROFILE_TYPES:
+            fail(f"{path}.type must be 'helm' or 'compose' (got {ptype!r}; 'helm.v3' is rejected)")
         else:
-            ok(f"{path}.type is helm")
+            ok(f"{path}.type is {ptype}")
         pid = profile.get("id")
         if not pid or pid in seen_ids:
             fail(f"{path}.id must be present and unique (got {pid!r})")
@@ -270,21 +303,27 @@ def cmd_fleet_manager(margo_path, app_dir, chart, version, registry):
             else:
                 ok(f"{cpath}.name {name!r}")
             component_names.add(name)
+            component_types[name] = ptype
             props = comp.get("properties") or {}
             repository = props.get("repository")
             revision = props.get("revision")
+            want = expected_compose_repository if ptype == "compose" else expected_repository
             if not isinstance(repository, str) or not OCI_REPOSITORY_PATTERN.match(repository):
                 fail(f"{cpath}.properties.repository must match ^oci://.+ (got {repository!r})")
-            elif repository != expected_repository:
-                fail(f"{cpath}.properties.repository must be {expected_repository} (got {repository})")
+            elif repository != want:
+                fail(f"{cpath}.properties.repository must be {want} (got {repository})")
             else:
                 ok(f"{cpath}.properties.repository {repository}")
             if not isinstance(revision, str) or not SEMVER_REVISION_PATTERN.match(revision):
                 fail(f"{cpath}.properties.revision must be a SemVer 2.0 string without a leading v (got {revision!r})")
-            elif revision != version:
+            elif ptype == "helm" and revision != version:
                 fail(f"{cpath}.properties.revision {revision} differs from the pin {version} in scripts/charts.tsv")
-            else:
+            elif ptype == "helm":
                 ok(f"{cpath}.properties.revision {revision} (SemVer, equals the pin)")
+            else:
+                ok(f"{cpath}.properties.revision {revision} (SemVer; the compose package version)")
+            if ptype == "compose" and len(components) != 1:
+                fail(f"{path}: a compose profile of this catalog has exactly one component")
             timeout = props.get("timeout")
             if timeout is not None and not (isinstance(timeout, str) and TIMEOUT_PATTERN.match(timeout)):
                 fail(f"{cpath}.properties.timeout must match ^\\d+m\\d+s$ (got {timeout!r})")
@@ -317,13 +356,19 @@ def cmd_fleet_manager(margo_path, app_dir, chart, version, registry):
         for k, target in enumerate(targets):
             pointer = target.get("pointer")
             comps = target.get("components") or []
-            if not isinstance(pointer, str) or not pointer or "" in pointer.split("."):
-                fail(f"{ppath}.targets[{k}].pointer {pointer!r} must be a dot path without empty segments")
             if not comps:
                 fail(f"{ppath}.targets[{k}] names no component")
+            kinds = {component_types.get(c) for c in comps}
             for c in comps:
                 if c not in component_names:
                     fail(f"{ppath}.targets[{k}] names unknown component {c!r}")
+            if len(kinds) > 1:
+                fail(f"{ppath}.targets[{k}] mixes helm and compose components (one target per profile type)")
+            if kinds == {"compose"}:
+                if not isinstance(pointer, str) or not ENV_NAME_PATTERN.match(pointer):
+                    fail(f"{ppath}.targets[{k}].pointer {pointer!r} must be an environment variable name for a compose component")
+            elif not isinstance(pointer, str) or not pointer or "" in pointer.split("."):
+                fail(f"{ppath}.targets[{k}].pointer {pointer!r} must be a dot path without empty segments")
     if params:
         ok(f"{len(params)} parameters, each with a string value and targets")
 
@@ -393,10 +438,22 @@ def resolve(doc):
     return values
 
 
+def components_of(doc, ptype):
+    return [c["name"] for p in profiles_of(doc) if p.get("type") == ptype for c in p.get("components") or []]
+
+
+def cmd_components(margo_path, ptype):
+    for name in components_of(load_yaml(margo_path), ptype):
+        print(name)
+
+
 def cmd_values(margo_path, out_dir):
     doc = load_yaml(margo_path)
     values = resolve(doc)
+    helm = set(components_of(doc, "helm"))
     for comp, vals in values.items():
+        if comp not in helm:
+            continue
         with open(os.path.join(out_dir, f"{comp}.values.yaml"), "w", encoding="utf-8") as f:
             # default_style='"' quotes every scalar: these are strings, as on the agent.
             yaml.safe_dump(vals, f, default_style='"', sort_keys=True)
@@ -479,7 +536,33 @@ def check_pod(where, pod):
         ok(f"{where}: Pod Security restricted (static check)")
 
 
-def cmd_rendered(manifest_path, margo_path):
+def load_images(images_tsv, app_dir_name):
+    """The pinned image references of an app: {reference: row}."""
+    refs = {}
+    with open(images_tsv, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            cols = line.rstrip("\n").split("\t")
+            if len(cols) < 5:
+                continue
+            name, upstream, tag, digest, apps = cols[:5]
+            if app_dir_name in apps.split(","):
+                refs[(name, tag, digest)] = upstream
+    return refs
+
+
+def check_images(where, images, refs, registry):
+    """Every image is <registry>/<name>:<tag>@<digest> of a pin of the app."""
+    allowed = {f"{registry}/{n}:{t}@{d}" for (n, t, d) in refs}
+    for image in images:
+        if image in allowed:
+            ok(f"{where}: image {image} (pinned in scripts/images.tsv)")
+        else:
+            fail(f"{where}: image {image!r} is not <{registry}/name:tag@digest> of a row of scripts/images.tsv for this app")
+
+
+def cmd_rendered(manifest_path, margo_path, images_tsv=None, registry=None, app_dir_name=None):
     archs = []
     for profile in profiles_of(load_yaml(margo_path)):
         archs += (((profile.get("requiredResources") or {}).get("cpu") or {}).get("architectures") or [])
@@ -502,10 +585,199 @@ def cmd_rendered(manifest_path, margo_path):
         for pod in pod_specs(d):
             check_pod(where, pod)
             check_arch(where, pod, archs)
+            if images_tsv:
+                containers = (pod.get("initContainers") or []) + (pod.get("containers") or [])
+                check_images(where, [c.get("image") for c in containers],
+                             load_images(images_tsv, app_dir_name), registry)
     if not any(d["kind"] in CLUSTER_SCOPED_KINDS for d in docs):
         ok("no cluster-scoped kind")
     if all(d["kind"] in AGENT_CREATABLE_KINDS for d in docs):
         ok("every kind is creatable by the agent's Role")
+
+
+# ------------------------------------------------------------------ compose
+
+def build_archive(src_dir, top, out_path):
+    """A deterministic .tar.gz of src_dir under the single top-level directory
+    `top`: sorted entries, owner 0/0, mtime 0, modes 0755/0644, no gzip
+    name or time, so the same files always give the same OCI digest."""
+    entries = []
+    for root, dirs, files in os.walk(src_dir):
+        dirs.sort()
+        for name in sorted(dirs + files):
+            full = os.path.join(root, name)
+            rel = os.path.relpath(full, src_dir)
+            if os.path.islink(full):
+                raise ValueError(f"{rel} is a symbolic link (not allowed in a compose package)")
+            entries.append((rel, full))
+    entries.sort()
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w", format=tarfile.USTAR_FORMAT) as tar:
+        def add(name, full):
+            info = tarfile.TarInfo(name)
+            info.uid = info.gid = 0
+            info.uname = info.gname = ""
+            info.mtime = 0
+            if full is None or os.path.isdir(full):
+                info.type = tarfile.DIRTYPE
+                info.mode = 0o755
+                tar.addfile(info)
+            else:
+                with open(full, "rb") as fh:
+                    data = fh.read()
+                info.size = len(data)
+                info.mode = 0o644
+                tar.addfile(info, io.BytesIO(data))
+        add(top, None)
+        for rel, full in entries:
+            add(f"{top}/{rel}", full)
+    with open(out_path, "wb") as out:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=out, mtime=0) as gz:
+            gz.write(raw.getvalue())
+
+
+def check_archive(path, top):
+    """The layout rules of the Margo "Compose Component Registry"."""
+    with tarfile.open(path, mode="r:gz") as tar:
+        members = tar.getmembers()
+    tops = {m.name.split("/", 1)[0] for m in members}
+    if len(tops) != 1:
+        fail(f"archive: expected exactly one top-level directory, got {sorted(tops)}")
+    elif tops != {top}:
+        fail(f"archive: the top-level directory should be the component name {top!r} (got {sorted(tops)})")
+    else:
+        ok(f"archive: one top-level directory {top}/")
+    names = {m.name for m in members}
+    if f"{top}/compose.yaml" in names:
+        ok(f"archive: {top}/compose.yaml")
+    else:
+        fail(f"archive: {top}/compose.yaml is missing (compose.yml and docker-compose.* are not valid)")
+    for m in members:
+        parts = m.name.split("/")
+        if m.name.startswith("/") or ".." in parts:
+            fail(f"archive: {m.name}: absolute path or ../")
+        if m.issym() or m.islnk():
+            fail(f"archive: {m.name}: links are not allowed")
+        if not (m.isdir() or m.isfile()):
+            fail(f"archive: {m.name}: only files and directories are allowed")
+        if m.mode & 0o7000:
+            fail(f"archive: {m.name}: setuid, setgid or sticky bit")
+
+
+def compose_rules(compose, refs, registry):
+    """The compose file rules of this catalog."""
+    services = compose.get("services") or {}
+    if not services:
+        fail("compose.yaml: no services")
+    images = []
+    for svc_name, svc in services.items():
+        where = f"compose.yaml: service {svc_name}"
+        if "build" in svc:
+            fail(f"{where}: build is not allowed (images only)")
+        images.append(svc.get("image"))
+        if svc.get("privileged"):
+            fail(f"{where}: privileged")
+        if svc.get("cap_add"):
+            fail(f"{where}: cap_add {svc['cap_add']}")
+        if "ALL" not in (svc.get("cap_drop") or []):
+            fail(f"{where}: cap_drop does not contain ALL")
+        if "no-new-privileges:true" not in (svc.get("security_opt") or []):
+            fail(f"{where}: security_opt does not contain no-new-privileges:true")
+        for field in ("network_mode", "pid", "ipc", "userns_mode"):
+            if str(svc.get(field, "")).startswith("host"):
+                fail(f"{where}: {field} host")
+        if svc.get("devices"):
+            fail(f"{where}: devices are not allowed")
+        for v in svc.get("volumes") or []:
+            source = v.get("source", "") if isinstance(v, dict) else str(v).split(":", 1)[0]
+            vtype = v.get("type") if isinstance(v, dict) else None
+            if vtype == "bind" or source.startswith(("/", ".", "~", "$")):
+                fail(f"{where}: bind mount {v!r} (a compose package must not use bind mounts)")
+        for secret in svc.get("secrets") or []:
+            fail(f"{where}: secrets are not allowed in a compose package ({secret!r})")
+        check_images(where, [svc.get("image")], refs, registry)
+    for secret_name, secret in (compose.get("secrets") or {}).items():
+        if isinstance(secret, dict) and "file" in secret:
+            fail(f"compose.yaml: file-source secret {secret_name!r} is not allowed")
+    if "name" in compose:
+        fail("compose.yaml: top-level name is not allowed (the device names the project)")
+    return images
+
+
+def cmd_compose(margo_path, app_dir, images_tsv, registry, out_dir):
+    doc = load_yaml(margo_path)
+    comps = [(p, c) for p in profiles_of(doc) if p.get("type") == "compose" for c in p.get("components") or []]
+    if not comps:
+        return
+    if len(comps) != 1:
+        fail(f"expected one compose component, got {len(comps)}")
+        return
+    _, comp = comps[0]
+    name = comp.get("name")
+    props = comp.get("properties") or {}
+    src = os.path.join(app_dir, "compose")
+    compose_file = os.path.join(src, "compose.yaml")
+    if not os.path.isfile(compose_file):
+        fail(f"{os.path.basename(app_dir)}/compose/compose.yaml does not exist")
+        return
+    archive = os.path.join(out_dir, f"{name}.tar.gz")
+    try:
+        build_archive(src, name, archive)
+    except ValueError as e:
+        fail(f"archive: {e}")
+        return
+    check_archive(archive, name)
+
+    with open(compose_file, encoding="utf-8") as f:
+        text = f.read()
+    compose = yaml.safe_load(text) or {}
+    compose_rules(compose, load_images(images_tsv, os.path.basename(os.path.normpath(app_dir))), registry)
+
+    # Variables against compose targets. Comment lines are not compose
+    # content, so they are left out.
+    body = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    params = doc.get("parameters") or {}
+    targets = {}
+    for key, param in params.items():
+        for target in param.get("targets") or []:
+            if name in (target.get("components") or []):
+                targets[target.get("pointer")] = (key, "" if param.get("value") is None else str(param.get("value")))
+    used = {}
+    for m in COMPOSE_VARIABLE.finditer(body):
+        var, op, default = m.group(1), m.group(2), m.group(3)
+        used.setdefault(var, []).append((op, default))
+    for m in COMPOSE_BARE_VARIABLE.finditer(body):
+        fail(f"compose.yaml: ${m.group(1)} without braces; write ${{{m.group(1)}:-default}}")
+    for var, uses in sorted(used.items()):
+        if var not in targets:
+            fail(f"compose.yaml: ${{{var}}} has no compose target in app/margo.yaml (escape a shell variable as $${{{var}}})")
+            continue
+        key, value = targets[var]
+        bad = [(op, d) for op, d in uses if op != ":-" or (d or "") != value]
+        if bad:
+            fail(f"compose.yaml: ${{{var}}} must be written ${{{var}:-{value}}} (the value of parameter {key}); found {bad}")
+        else:
+            ok(f"compose.yaml: ${{{var}:-{value}}} equals parameter {key}")
+    for var, (key, _) in sorted(targets.items()):
+        if var not in used:
+            fail(f"parameter {key}: compose target {var} is not used in compose.yaml")
+
+    with open(os.path.join(out_dir, f"{name}.env"), "w", encoding="utf-8") as f:
+        for var, (_, value) in sorted(targets.items()):
+            if "\n" in value or "'" in value:
+                fail(f"parameter for {var}: a default with a newline or a single quote cannot be written to an env file")
+                continue
+            f.write(f"{var}='{value}'\n")
+    smoke = os.environ.get("SMOKE_IMAGE_REGISTRY")
+    if smoke:
+        override = {"services": {}}
+        for svc_name, svc in (compose.get("services") or {}).items():
+            image = str(svc.get("image", ""))
+            if image.startswith(registry + "/"):
+                override["services"][svc_name] = {"image": smoke.rstrip("/") + image[len(registry):]}
+        with open(os.path.join(out_dir, f"{name}.smoke.yaml"), "w", encoding="utf-8") as f:
+            yaml.safe_dump(override, f, sort_keys=True)
+    print(f"{name} {props.get('repository')} {props.get('revision')}")
 
 
 def main(argv):
@@ -517,12 +789,16 @@ def main(argv):
         cmd_bart(*args)
     elif cmd == "schema-rules" and len(args) == 2:
         cmd_schema_rules(*args)
-    elif cmd == "fleet-manager" and len(args) == 5:
+    elif cmd == "fleet-manager" and len(args) == 6:
         cmd_fleet_manager(*args)
+    elif cmd == "components" and len(args) == 2:
+        cmd_components(*args)
     elif cmd == "values" and len(args) == 2:
         cmd_values(*args)
-    elif cmd == "rendered" and len(args) == 2:
+    elif cmd == "rendered" and len(args) in (2, 5):
         cmd_rendered(*args)
+    elif cmd == "compose" and len(args) == 5:
+        cmd_compose(*args)
     else:
         print(__doc__)
         return 2

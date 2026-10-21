@@ -1,0 +1,64 @@
+# Compose package of the InfluxDB app: the component influxdb-compose of the
+# compose deployment profile in app/margo.yaml.
+#
+# Each Margo parameter of this profile targets an environment variable
+# (Target.pointer). The Margo spec does not say whether the device sets the
+# variable in the container environment or uses it for ${VAR} interpolation
+# here, so each variable has the same name in both places and its default
+# here equals the parameter value in app/margo.yaml (scripts/check.sh checks
+# that). INFLUXDB_PORT only works through interpolation.
+#
+# The DOCKER_INFLUXDB_INIT_* values apply once, on the first start with an
+# empty volume (the image's setup mode). Later changes have no effect.
+services:
+  influxdb:
+    image: ghcr.io/logiccloudag/margo-images/influxdb:2.9.1-alpine@sha256:f551adeb94b6f97626d2043ec90ed17f81de18d15bb5412d2101e0965c93c797
+    restart: unless-stopped
+    # The image's own user influxdb. Its entrypoint then skips the root-only
+    # steps (chown, setpriv), so no capability is needed.
+    user: "1000:1000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${INFLUXDB_PORT:-8086}:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${DOCKER_INFLUXDB_INIT_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:-}
+      DOCKER_INFLUXDB_INIT_ORG: ${DOCKER_INFLUXDB_INIT_ORG:-influxdata}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${DOCKER_INFLUXDB_INIT_BUCKET:-default}
+      DOCKER_INFLUXDB_INIT_RETENTION: ${DOCKER_INFLUXDB_INIT_RETENTION:-0s}
+      # Empty: setup generates the operator token.
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN:-}
+    # Setup needs a password. When the parameter is empty, the first start
+    # generates one and stores it, readable only by the influxdb user, in
+    # /etc/influxdb2/generated-admin-password; it is never logged:
+    #   docker exec <container> cat /etc/influxdb2/generated-admin-password
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -euo pipefail
+        if [ -z "$${DOCKER_INFLUXDB_INIT_PASSWORD}" ] && [ ! -f /var/lib/influxdb2/influxd.bolt ]; then
+          umask 077
+          head -c 32 /dev/urandom | base64 | tr -d '/+=\n' | head -c 32 >/etc/influxdb2/generated-admin-password
+          DOCKER_INFLUXDB_INIT_PASSWORD="$$(cat /etc/influxdb2/generated-admin-password)"
+          export DOCKER_INFLUXDB_INIT_PASSWORD
+          echo "Generated the administrator password in /etc/influxdb2/generated-admin-password"
+        fi
+        exec /entrypoint.sh influxd
+    healthcheck:
+      test: ["CMD", "influx", "ping", "--host", "http://127.0.0.1:8086"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+
+volumes:
+  influxdb-data:
+  influxdb-config:

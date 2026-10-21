@@ -3,13 +3,14 @@ kind: ApplicationDescription
 id: mosquitto
 metadata:
   name: Eclipse Mosquitto
-  version: "2.0.1"
+  version: "2.1.0"
   description: >-
     Eclipse Mosquitto 2.1 MQTT broker (MQTT 3.1, 3.1.1 and 5.0) from the
     official eclipse-mosquitto image, installed from mosquitto-restricted, a
     small logiccloud chart. Runs under Pod Security "restricted" with
     namespace-scoped resources only. Anonymous access is disabled: clients
     authenticate against a password file from an existing Secret.
+    A compose profile runs the same image with Docker Compose.
   catalog:
     organization:
       - name: logiccloud
@@ -31,7 +32,26 @@ deploymentProfiles:
         properties:
           # The chart in helm-mosquitto/chart.
           repository: oci://ghcr.io/logiccloudag/margo-charts/mosquitto-restricted
-          revision: "0.1.0"
+          revision: "0.2.0"
+          wait: true
+          timeout: "10m0s"
+    requiredResources:
+      cpu:
+        cores: 0.25
+        architectures:
+          - amd64
+          - arm64
+      memory: 128Mi
+      storage: 1Gi
+  - type: compose
+    id: compose
+    components:
+      - name: mosquitto-compose
+        properties:
+          # The compose package built from helm-mosquitto/compose
+          # (scripts/publish-compose.sh).
+          repository: oci://ghcr.io/logiccloudag/margo-compose/mosquitto
+          revision: "1.0.0"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -48,6 +68,11 @@ deploymentProfiles:
 # The Pod Security settings (UID 1883, seccomp RuntimeDefault, no privilege
 # escalation, all capabilities dropped, read-only root file system) are fixed
 # in the chart and are not parameters.
+# A target of a *-compose component names an environment variable of
+# compose/compose.yaml instead (Margo Target.pointer for compose); its
+# default there equals the value here. Parameters without such a target
+# (for example sizes, resources and the fixed ones) apply to the Helm
+# profile only.
 parameters:
   # Port the broker listens on inside the pod (1024 to 65535).
   listenerPort:
@@ -55,11 +80,15 @@ parameters:
     targets:
       - pointer: listener.port
         components: [mosquitto]
+      - pointer: MOSQUITTO_LISTENER_PORT
+        components: [mosquitto-compose]
   servicePort:
     value: "1883"
     targets:
       - pointer: service.port
         components: [mosquitto]
+      - pointer: MOSQUITTO_PORT
+        components: [mosquitto-compose]
   # ClusterIP, NodePort or LoadBalancer.
   serviceType:
     value: "ClusterIP"
@@ -79,12 +108,27 @@ parameters:
     targets:
       - pointer: auth.passwordFileKey
         components: [mosquitto]
+  # Compose profile only: one user in a password file the container writes
+  # to memory at start (a compose package carries no Secret). Empty: no
+  # password file. A user name needs a password.
+  mqttUsername:
+    value: ""
+    targets:
+      - pointer: MOSQUITTO_USERNAME
+        components: [mosquitto-compose]
+  mqttPassword:
+    value: ""
+    targets:
+      - pointer: MOSQUITTO_PASSWORD
+        components: [mosquitto-compose]
   # "true" allows clients without credentials.
   allowAnonymous:
     value: "false"
     targets:
       - pointer: auth.allowAnonymous
         components: [mosquitto]
+      - pointer: MOSQUITTO_ALLOW_ANONYMOUS
+        components: [mosquitto-compose]
   # "true": message store on a PVC of the cluster default StorageClass;
   # "false": an emptyDir (lost on restart).
   persistenceEnabled:
@@ -117,11 +161,17 @@ configuration:
     - name: Authentication
       settings:
         - parameter: authExistingSecret
-          name: Secret with the password file
+          name: Secret with the password file (Kubernetes)
           schema: optionalText
         - parameter: authPasswordFileKey
-          name: Key of the password file in the Secret
+          name: Key of the password file in the Secret (Kubernetes)
           schema: text
+        - parameter: mqttUsername
+          name: User name (compose)
+          schema: optionalText
+        - parameter: mqttPassword
+          name: Password (compose)
+          schema: optionalText
         - parameter: allowAnonymous
           name: Allow anonymous clients (true or false)
           schema: text

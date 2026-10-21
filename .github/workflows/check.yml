@@ -1,0 +1,66 @@
+# All checks of the catalog (scripts/check.sh) on a kind cluster, plus the
+# compose smoke test. Images come from a local registry that holds the same
+# digests as ghcr.io/logiccloudag/margo-images, so a pull request can check
+# new pins before they are published. publish.yml calls this workflow first.
+name: check
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # bart (FLECS), pinned by digest; the registry offers no 0.4.x tag.
+  BART_IMAGE: cr.flecs.tech/flecs/bart@sha256:b35ef7dca69925ae3190b984b60d88b423dd76b6f37c772ea9b972a943844e13
+  # kind v0.33.0 default node image.
+  KIND_NODE_IMAGE: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+  LOCAL_REGISTRY_PORT: "5001"
+  PYYAML_VERSION: "6.0.3"
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          scripts/ci/install-tools.sh "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet "pyyaml==$PYYAML_VERSION"
+          echo "$RUNNER_TEMP/venv/bin" >>"$GITHUB_PATH"
+
+      - name: ShellCheck
+        run: shellcheck -x scripts/*.sh scripts/lib/*.sh scripts/ci/*.sh
+
+      - name: Start the local image registry and copy the pinned images
+        run: |
+          set -euo pipefail
+          nohup crane registry serve --address "0.0.0.0:$LOCAL_REGISTRY_PORT" >"$RUNNER_TEMP/registry.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fsS "http://127.0.0.1:$LOCAL_REGISTRY_PORT/v2/" >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS "http://127.0.0.1:$LOCAL_REGISTRY_PORT/v2/" >/dev/null || { echo "ERROR: the local registry did not start" >&2; exit 1; }
+          IMAGE_REGISTRY="localhost:$LOCAL_REGISTRY_PORT/logiccloudag/margo-images" CRANE_INSECURE=1 \
+            scripts/mirror-images.sh
+
+      - name: Create the kind cluster
+        run: scripts/ci/kind-with-mirror.sh "$LOCAL_REGISTRY_PORT" "$KIND_NODE_IMAGE"
+
+      - name: scripts/check.sh --cluster --compose
+        env:
+          SMOKE_IMAGE_REGISTRY: localhost:${{ env.LOCAL_REGISTRY_PORT }}/logiccloudag/margo-images
+        run: scripts/check.sh --cluster --compose

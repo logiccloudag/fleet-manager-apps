@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.1.0
+
+- New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/grafana` 1.0.0. The settings administrator user, administrator password and service port (the host port) apply to it. An empty administrator password means Grafana's default `admin`, which Grafana asks to change at the first login.
+- The image now comes from `ghcr.io/logiccloudag/margo-images/grafana:13.2.3-distroless`, a copy of `docker.io/grafana/grafana:13.2.3-distroless` with the same multi-arch digest, pulled by digest. Devices no longer need a `docker.io` mirror. The chart is unchanged; fixed parameters set the image.
+
 ## 1.0.2
 
 - `adminPassword` and `adminExistingSecret` may now be left empty (an empty password lets the chart generate one; an empty Secret name uses the password). fleet-manager showed them as required. The chart is unchanged.

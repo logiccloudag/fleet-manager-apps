@@ -1,0 +1,27 @@
+# Compose package of the Node-RED app: the component node-red-compose of the
+# compose deployment profile in app/margo.yaml.
+#
+# Each Margo parameter of this profile targets an environment variable
+# (Target.pointer). The Margo spec does not say whether the device sets the
+# variable in the container environment or uses it for ${VAR} interpolation
+# here, so its default here equals the parameter value in app/margo.yaml
+# (scripts/check.sh checks that). NODE_RED_PORT only works through
+# interpolation.
+services:
+  node-red:
+    image: ghcr.io/logiccloudag/margo-images/node-red:4.1.2@sha256:216e7403aab9888f7e68de9e468fed31bb9d7b2d38117c08e645095a63658a2f
+    restart: unless-stopped
+    # The image runs as its own user node-red (UID 1000), needs no
+    # capability, and has a health check (node /healthcheck.js).
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${NODE_RED_PORT:-1880}:1880"
+    # Flows, credentials and installed nodes.
+    volumes:
+      - node-red-data:/data
+
+volumes:
+  node-red-data:
