@@ -13,13 +13,24 @@ PORT="${1:?usage: kind-with-mirror.sh <registry-port> <kind-node-image>}"
 NODE_IMAGE="${2:?usage: kind-with-mirror.sh <registry-port> <kind-node-image>}"
 
 kind create cluster --name check --image "$NODE_IMAGE" --wait 180s
-# The runner, seen from the kind nodes: the IPv4 gateway of the kind network.
-GATEWAY="$(docker network inspect kind | jq -r '[.[0].IPAM.Config[].Gateway | select(test("^[0-9.]+$"))][0] // empty')"
-[ -n "$GATEWAY" ] || {
-  echo "ERROR: no IPv4 gateway on the docker network kind" >&2
+NODES="$(kind get nodes --name check)"
+[ -n "$NODES" ] || {
+  echo "ERROR: kind created no node" >&2
   exit 1
 }
-for node in $(kind get nodes --name check); do
+# The runner, seen from the kind nodes: the IPv4 default gateway inside a
+# node (the gateway of the docker network kind). Docker's IPAM output is not
+# used, because an IPv6 entry there may have no gateway.
+first="$(printf '%s\n' "$NODES" | head -n 1)"
+GATEWAY="$(docker exec "$first" ip -4 route show default | awk '{ print $3; exit }')"
+case "$GATEWAY" in
+  *.*.*.*) ;;
+  *)
+    echo "ERROR: no IPv4 default gateway in kind node $first (got '$GATEWAY')" >&2
+    exit 1
+    ;;
+esac
+for node in $NODES; do
   docker exec "$node" mkdir -p /etc/containerd/certs.d/ghcr.io
   printf 'server = "https://ghcr.io"\n\n[host."http://%s:%s"]\n  capabilities = ["pull", "resolve"]\n' "$GATEWAY" "$PORT" \
     | docker exec -i "$node" cp /dev/stdin /etc/containerd/certs.d/ghcr.io/hosts.toml
