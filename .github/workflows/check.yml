@@ -45,20 +45,11 @@ jobs:
       - name: ShellCheck
         run: shellcheck -x scripts/*.sh scripts/lib/*.sh scripts/ci/*.sh
 
-      - name: Start the local image registry and copy the pinned images
-        run: |
-          set -euo pipefail
-          nohup crane registry serve --address "0.0.0.0:$LOCAL_REGISTRY_PORT" >"$RUNNER_TEMP/registry.log" 2>&1 &
-          for _ in $(seq 1 30); do
-            curl -fsS "http://127.0.0.1:$LOCAL_REGISTRY_PORT/v2/" >/dev/null 2>&1 && break
-            sleep 1
-          done
-          curl -fsS "http://127.0.0.1:$LOCAL_REGISTRY_PORT/v2/" >/dev/null || { echo "ERROR: the local registry did not start" >&2; exit 1; }
-          IMAGE_REGISTRY="localhost:$LOCAL_REGISTRY_PORT/logiccloudag/margo-images" CRANE_INSECURE=1 \
-            scripts/mirror-images.sh
+      - name: Unit tests of the upstream check
+        run: python3 -m unittest discover -s scripts/tests -v
 
-      - name: Create the kind cluster
-        run: scripts/ci/kind-with-mirror.sh "$LOCAL_REGISTRY_PORT" "$KIND_NODE_IMAGE"
+      - name: Local registry with the pinned images, kind cluster
+        run: scripts/ci/gate-setup.sh "$LOCAL_REGISTRY_PORT" "$KIND_NODE_IMAGE"
 
       - name: scripts/check.sh --cluster --compose
         env:
