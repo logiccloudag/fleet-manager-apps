@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: grafana
 metadata:
   name: Grafana
-  version: "1.1.0"
+  version: "1.2.0"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
@@ -32,7 +32,7 @@ deploymentProfiles:
         properties:
           # Unchanged mirror of oci://ghcr.io/grafana-community/helm-charts/grafana.
           repository: oci://ghcr.io/logiccloudag/margo-charts/grafana
-          revision: "13.2.7"
+          revision: "13.7.0"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -51,7 +51,7 @@ deploymentProfiles:
           # The compose package built from helm-grafana/compose
           # (scripts/publish-compose.sh).
           repository: oci://ghcr.io/logiccloudag/margo-compose/grafana
-          revision: "1.0.0"
+          revision: "1.1.0"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -88,13 +88,13 @@ parameters:
       - pointer: image.repository
         components: [grafana]
   imageTag:
-    value: "13.2.3-distroless"
+    value: "13.2.4-distroless"
     targets:
       - pointer: image.tag
         components: [grafana]
   # The chart prefixes "sha256:" itself.
   imageSha:
-    value: "202e5d5b3f8499e70ccac7991eea6d7da72d2790eb2e0597e7987acf724e7180"
+    value: "ae3d3add290adbe6a88412229f5d76fd7bb82743050881698642d3d62f277e35"
     targets:
       - pointer: image.sha
         components: [grafana]

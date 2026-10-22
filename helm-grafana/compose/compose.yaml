@@ -9,7 +9,7 @@
 # that). GRAFANA_PORT only works through interpolation.
 services:
   grafana:
-    image: ghcr.io/logiccloudag/margo-images/grafana:13.2.3-distroless@sha256:202e5d5b3f8499e70ccac7991eea6d7da72d2790eb2e0597e7987acf724e7180
+    image: ghcr.io/logiccloudag/margo-images/grafana:13.2.4-distroless@sha256:ae3d3add290adbe6a88412229f5d76fd7bb82743050881698642d3d62f277e35
     restart: unless-stopped
     # The image runs as its own user grafana (UID 472) and needs no
     # capability.

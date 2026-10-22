@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.2.0
+
+- Chart: grafana 13.2.7 → 13.7.0 (unchanged mirror).
+- Image: `ghcr.io/logiccloudag/margo-images/grafana:13.2.4-distroless`, a copy of `docker.io/grafana/grafana:13.2.4-distroless` (13.2.3-distroless before).
+- Compose package 1.1.0 with the new image.
+- Automatic update by the weekly upstream check (FM-1631).
+
 ## 1.1.0
 
 - New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/grafana` 1.0.0. The settings administrator user, administrator password and service port (the host port) apply to it. An empty administrator password means Grafana's default `admin`, which Grafana asks to change at the first login.

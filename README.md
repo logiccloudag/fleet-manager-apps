@@ -61,7 +61,7 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 
 | App (`id`) | Chart in `margo-charts` | Upstream chart | Chart license | Application and image | Type |
 | --- | --- | --- | --- | --- | --- |
-| `grafana` | `grafana` 13.2.7 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.2.7 | Apache-2.0 | Grafana 13.2.3, copy of `docker.io/grafana/grafana:13.2.3-distroless` (AGPL-3.0) | mirror |
+| `grafana` | `grafana` 13.7.0 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | mirror |
 | `influxdb` | `influxdb2-restricted` 0.2.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
 | `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
