@@ -1,0 +1,94 @@
+# Weekly upstream check (FM-1631, ADR FM-A-202 decision 5): finds newer
+# stable upstream charts and images (scripts/upstream-check.py plan).
+# A patch or minor bump is regenerated, gated (scripts/check.sh --cluster
+# --compose) and committed to the branch; publish.yml is dispatched after
+# the push. A major bump or a red gate becomes a YouTrack issue on the
+# current sprint (scripts/youtrack-issue.py) and publishes nothing.
+name: upstream-check
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only report the plan (no commit, no publish, no issue)
+        type: boolean
+        default: true
+      publish:
+        description: Dispatch publish.yml after pushing regenerated apps
+        type: boolean
+        default: true
+      issue_tag:
+        description: YouTrack tag of created issues (use a test tag for a forced test)
+        type: string
+        default: margo-apps
+      apps:
+        description: App directories to check, space separated (empty for all)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-check-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BART_IMAGE: cr.flecs.tech/flecs/bart@sha256:b35ef7dca69925ae3190b984b60d88b423dd76b6f37c772ea9b972a943844e13
+  KIND_NODE_IMAGE: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+  LOCAL_REGISTRY_PORT: "5001"
+  PYYAML_VERSION: "6.0.3"
+
+jobs:
+  upstream-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The job pushes regenerated apps with the GITHUB_TOKEN.
+          persist-credentials: true
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          scripts/ci/install-tools.sh "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet "pyyaml==$PYYAML_VERSION"
+          echo "$RUNNER_TEMP/venv/bin" >>"$GITHUB_PATH"
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: Plan
+        env:
+          APPS: ${{ inputs.apps }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086 # APPS is a space separated list
+          scripts/upstream-check.py plan "$RUNNER_TEMP/plan.json" $APPS
+          echo "REGENERATE=$(jq '[.[] | select(.action == "regenerate")] | length' "$RUNNER_TEMP/plan.json")" >>"$GITHUB_ENV"
+
+      - name: Local registry with the pinned images, kind cluster
+        if: env.REGENERATE != '0' && (github.event_name == 'schedule' || !inputs.dry_run)
+        run: scripts/ci/gate-setup.sh "$LOCAL_REGISTRY_PORT" "$KIND_NODE_IMAGE"
+
+      - name: Regenerate, gate, commit or open issues
+        env:
+          DRY_RUN: ${{ github.event_name != 'schedule' && inputs.dry_run }}
+          PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
+          REF: ${{ github.ref_name }}
+          YOUTRACK_TOKEN: ${{ secrets.YOUTRACK_TOKEN }}
+          YOUTRACK_TAG: ${{ inputs.issue_tag || 'margo-apps' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          scripts/ci/upstream-apply.sh "$RUNNER_TEMP/plan.json"

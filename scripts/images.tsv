@@ -7,9 +7,13 @@
 #   digest    the upstream multi-arch index digest; `crane copy` keeps it,
 #             so the copy has the same digest
 #   apps      the app directories that use the image (comma separated)
+#   track     how the weekly upstream check (scripts/upstream-check.py) finds
+#             a newer image: chart = the appVersion of the app's mirror chart
+#             (same prefix and suffix as tag); tags = the newest upstream tag
+#             of the same shape as tag
 # Charts and compose files reference ghcr.io/logiccloudag/margo-images/<name>:<tag>@<digest>.
-grafana	docker.io/grafana/grafana	13.2.3-distroless	sha256:202e5d5b3f8499e70ccac7991eea6d7da72d2790eb2e0597e7987acf724e7180	helm-grafana
-influxdb	docker.io/library/influxdb	2.9.1-alpine	sha256:f551adeb94b6f97626d2043ec90ed17f81de18d15bb5412d2101e0965c93c797	helm-influxdb
-eclipse-mosquitto	docker.io/library/eclipse-mosquitto	2.1.2-alpine	sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408	helm-mosquitto
-node-red	docker.io/nodered/node-red	4.1.2	sha256:216e7403aab9888f7e68de9e468fed31bb9d7b2d38117c08e645095a63658a2f	helm-node-red
-traefik	docker.io/library/traefik	v3.7.14	sha256:575fa15b135078fe5e50aa847987d96dbddd7b093c172429618404df73f3fa7c	helm-traefik
+grafana	docker.io/grafana/grafana	13.2.3-distroless	sha256:202e5d5b3f8499e70ccac7991eea6d7da72d2790eb2e0597e7987acf724e7180	helm-grafana	chart
+influxdb	docker.io/library/influxdb	2.9.1-alpine	sha256:f551adeb94b6f97626d2043ec90ed17f81de18d15bb5412d2101e0965c93c797	helm-influxdb	tags
+eclipse-mosquitto	docker.io/library/eclipse-mosquitto	2.1.2-alpine	sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408	helm-mosquitto	tags
+node-red	docker.io/nodered/node-red	4.1.2	sha256:216e7403aab9888f7e68de9e468fed31bb9d7b2d38117c08e645095a63658a2f	helm-node-red	chart
+traefik	docker.io/library/traefik	v3.7.14	sha256:575fa15b135078fe5e50aa847987d96dbddd7b093c172429618404df73f3fa7c	helm-traefik	tags
