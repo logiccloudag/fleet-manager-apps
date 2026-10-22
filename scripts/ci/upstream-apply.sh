@@ -2,13 +2,15 @@
 # Acts on the plan of scripts/upstream-check.py (weekly upstream check,
 # FM-1631):
 #
-#   regenerate  scripts/upstream-check.py regenerate, copy the new images to
-#               the local gate registry, run the full gate
-#               (scripts/check.sh --cluster --compose <app>). Green: commit
-#               "chore(<id>): upstream <old> → <new>". Red: undo the changes
-#               and create an issue with the gate log.
-#   issue       a major bump: create an issue (scripts/youtrack-issue.py),
-#               publish nothing and commit nothing.
+#   regenerate  an update within the current major: scripts/upstream-check.py
+#               regenerate, copy the new images to the local gate registry,
+#               run the full gate (scripts/check.sh --cluster --compose
+#               <app>). Green: commit "chore(<id>): upstream <old> → <new>".
+#               Red: undo the changes and create an issue with the gate log.
+#   issue       a new major version: create an issue
+#               (scripts/youtrack-issue.py), one per app and target major.
+# An app can have both (FM-1731): the update within the major is applied and
+# the major upgrade is left to a human.
 #
 # Then it pushes the commits to REF and, with PUBLISH=true, dispatches
 # publish.yml on REF (a push with GITHUB_TOKEN starts no workflow). Every
@@ -45,9 +47,10 @@ trap 'rm -rf "$WORK"' EXIT
 ROWS=()
 row() { ROWS+=("| \`$1\` | $2 |"); }
 
-# issue <id> <old> <new> <reason> <details-file>: creates or finds the issue.
+# issue <id> <old> <new> <reason> <details-file> [dedupe-regex]: creates or
+# finds the issue.
 issue() {
-  local id="$1" old="$2" new="$3" reason="$4" details="$5" out flag=()
+  local id="$1" old="$2" new="$3" reason="$4" details="$5" dedupe="${6:-}" out flag=()
   local summary="fleet-manager-apps: plan $id upgrade $old → $new"
   {
     echo "The weekly upstream check of logiccloudag/fleet-manager-apps (FM-1631) could not update \`$id\` automatically: $reason."
@@ -59,6 +62,7 @@ issue() {
     echo "Plan the upgrade by hand (README.md \"Bumping a chart\", \"Bumping an image\"), validate with \`scripts/check.sh --cluster --compose\` and merge to main."
   } >"$WORK/desc.md"
   [ "$DRY_RUN" != true ] || flag=(--dry-run)
+  [ -z "$dedupe" ] || flag+=(--dedupe-regex "$dedupe")
   out="$(python3 scripts/youtrack-issue.py ${flag[@]+"${flag[@]}"} "$summary" "$WORK/desc.md")"
   echo "$out"
   case "$out" in
@@ -68,31 +72,31 @@ issue() {
   esac
 }
 
-components() { # <app>: markdown list of the planned changes
+components() { # <app>: markdown list of the planned updates within the major
   jq -r --arg a "$1" '.[] | select(.app == $a) | .components[] | select(.bump != "none")
     | "- \(.kind) `\(.name)`: \(.current) → \(.latest) (\(.bump))"' "$PLAN"
+}
+
+majors() { # <app>: markdown list of the new major versions
+  jq -r --arg a "$1" '.[] | select(.app == $a) | .components[] | select(.major != null)
+    | "- \(.kind) `\(.name)`: \(.current) → \(.major) (major)"' "$PLAN"
 }
 
 COMMITS=0
 for app in $(jq -r '.[].app' "$PLAN"); do
   id="$(jq -r --arg a "$app" '.[] | select(.app == $a) | .id' "$PLAN")"
-  action="$(jq -r --arg a "$app" '.[] | select(.app == $a) | .action' "$PLAN")"
-  first="$(jq -r --arg a "$app" '[.[] | select(.app == $a) | .components[] | select(.bump != "none")][0] | "\(.current) \(.latest)"' "$PLAN")"
-  old="${first% *}"
-  new="${first#* }"
-  echo "== $app: $action"
-  case "$action" in
-    none) row "$id" "up to date" ;;
-    issue)
-      components "$app" >"$WORK/details.md"
-      issue "$id" "$old" "$new" "a major upstream version" "$WORK/details.md"
-      ;;
-    regenerate)
-      if [ "$DRY_RUN" = true ]; then
-        row "$id" "dry run: would regenerate $old → $new and run the gate"
-        components "$app"
-        continue
-      fi
+  regen="$(jq -r --arg a "$app" '.[] | select(.app == $a) | .regenerate' "$PLAN")"
+  major="$(jq -r --arg a "$app" '.[] | select(.app == $a) | .issue' "$PLAN")"
+  echo "== $app: regenerate=$regen issue=$major"
+  [ "$regen" = true ] || [ "$major" = true ] || row "$id" "up to date"
+  if [ "$regen" = true ]; then
+    first="$(jq -r --arg a "$app" '[.[] | select(.app == $a) | .components[] | select(.bump != "none")][0] | "\(.current) \(.latest)"' "$PLAN")"
+    old="${first% *}"
+    new="${first#* }"
+    if [ "$DRY_RUN" = true ]; then
+      row "$id" "dry run: would regenerate $old → $new and run the gate"
+      components "$app"
+    else
       log="$WORK/$app.log"
       ok=1
       subject="$(python3 scripts/upstream-check.py regenerate "$PLAN" "$app" 2>"$log" | tail -n 1)" || ok=0
@@ -133,9 +137,17 @@ for app in $(jq -r '.[].app' "$PLAN"); do
         } >"$WORK/details.md"
         issue "$id" "$old" "$new" "the regeneration or the gate failed" "$WORK/details.md"
       fi
-      ;;
-    *) echo "ERROR: unknown action $action for $app" >&2; exit 1 ;;
-  esac
+    fi
+  fi
+  if [ "$major" = true ]; then
+    first="$(jq -r --arg a "$app" '[.[] | select(.app == $a) | .components[] | select(.major != null)][0] | "\(.current) \(.major)"' "$PLAN")"
+    old="${first% *}"
+    new="${first#* }"
+    target_major="$(python3 -c 'import re, sys; print(re.match(r"^[^0-9]*([0-9]+)", sys.argv[1]).group(1))' "$new")"
+    majors "$app" >"$WORK/details.md"
+    issue "$id" "$old" "$new" "a major upstream version" "$WORK/details.md" \
+      "^fleet-manager-apps: plan $id upgrade .* → [^0-9]*$target_major\."
+  fi
 done
 
 if [ "$COMMITS" -gt 0 ]; then

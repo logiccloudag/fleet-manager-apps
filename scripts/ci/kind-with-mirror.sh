@@ -21,7 +21,7 @@ NODES="$(kind get nodes --name check)"
 # The runner, seen from the kind nodes: the IPv4 default gateway inside a
 # node (the gateway of the docker network kind). Docker's IPAM output is not
 # used, because an IPv6 entry there may have no gateway.
-first="$(printf '%s\n' "$NODES" | head -n 1)"
+first="$(printf '%s\n' "$NODES" | sed -n 1p)"
 GATEWAY="$(docker exec "$first" ip -4 route show default | awk '{ print $3; exit }')"
 case "$GATEWAY" in
   *.*.*.*) ;;

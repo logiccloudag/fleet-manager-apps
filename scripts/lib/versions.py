@@ -62,9 +62,10 @@ def max_bump(*bumps):
     return max(bumps, key=BUMPS.index) if bumps else "none"
 
 
-def newest(current, candidates):
+def newest(current, candidates, same_major=False):
     """The highest stable candidate of the same shape as `current`, or
-    `current` itself when there is no higher one."""
+    `current` itself when there is no higher one. With `same_major`, only
+    candidates of the current major version count (FM-1731)."""
     cs = shape(current)
     if cs is None:
         raise ValueError(f"not a version: {current!r}")
@@ -74,6 +75,8 @@ def newest(current, candidates):
         if s is None or not is_stable(tag):
             continue
         if (s[0], s[2], s[3]) != (cs[0], cs[2], cs[3]):
+            continue
+        if same_major and core(tag)[0] != core(current)[0]:
             continue
         if core(tag) > core(best):
             best = tag

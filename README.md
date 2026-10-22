@@ -485,24 +485,36 @@ stable upstream versions of every pin:
 | image, `track` `tags` (InfluxDB, Mosquitto, Traefik) | the newest upstream tag of the same shape: same prefix and suffix (`2.9.1-alpine`, `v3.7.14`), no `rc`, `alpha`, `beta`, `dev` or nightly tags |
 | image, `track` `chart` (Grafana, Node-RED) | the `appVersion` of the new mirror chart, with the tag's prefix and suffix |
 
-The highest bump of an app decides what happens (`scripts/upstream-check.py
-plan`):
+Per pin, `scripts/upstream-check.py plan` records two versions: the
+newest within the current major version (the update target) and, when
+there is one, the newest major version. An app can get both actions
+(FM-1731):
 
-- **Patch or minor:** `scripts/upstream-check.py regenerate` rewrites the
-  app. That covers the pins, every image reference, the chart version of a
-  wrapper or local chart, the revisions, the compose revision when an image
-  changed, `metadata.version`, the release notes and the README table. The
-  full gate (`scripts/check.sh --cluster --compose <app>`) then runs with
-  the new images in a local registry. Green: a commit `chore(<id>):
-  upstream <old> → <new>` is pushed, and `publish.yml` is dispatched (a push
-  with the `GITHUB_TOKEN` starts no workflow). Red: the changes are undone
-  and an issue is opened, as for a major bump.
-- **Major, or a red gate:** nothing is committed or published.
+- **An update within the current major** (patch or minor):
+  `scripts/upstream-check.py regenerate` rewrites the app. That covers the
+  pins, every image reference, the chart version of a wrapper or local
+  chart, the revisions, the compose revision when an image changed,
+  `metadata.version`, the release notes and the README table. The full gate
+  (`scripts/check.sh --cluster --compose <app>`) then runs with the new
+  images in a local registry. Green: a commit `chore(<id>): upstream <old>
+  → <new>` is pushed, and `publish.yml` is dispatched (a push with the
+  `GITHUB_TOKEN` starts no workflow). Red: the changes are undone and an
+  issue is opened with the gate log.
+- **A new major version:** it is never applied automatically.
   `scripts/youtrack-issue.py` opens a Task in YouTrack project FM. Its
   summary is `fleet-manager-apps: plan <id> upgrade <old> → <new>`, its
-  description holds the plan and the gate log, it is tagged `margo-apps`
-  and it goes on the current sprint. No second issue is opened while one
-  with the same summary is not Done.
+  description holds the plan, it is tagged `margo-apps` and it goes on the
+  current sprint. One issue per app and target major: while an issue that
+  is not Done matches `plan <id> upgrade … → <major>.`, no second one is
+  opened, even though the old version in the summary moves with the updates
+  within the current major.
+
+  For example, Grafana's chart 13.2.7 gets 13.7.0 automatically, and 14.0.1
+  waits in an issue.
+
+An image that follows its chart (`track` `chart`) stays inside the
+chart's major as well. If the chart's new `appVersion` would be a new image
+major, neither is updated, and the major goes to the issue.
 
 The run summary lists, per app: up to date, regenerated, or issue created
 or existing (with link).
