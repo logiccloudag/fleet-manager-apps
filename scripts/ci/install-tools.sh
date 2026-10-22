@@ -55,6 +55,6 @@ install -m 0755 "$TMP/kubeconform" "$DIR/kubeconform"
 "$DIR/helm" version --short
 "$DIR/kind" version
 echo "crane $("$DIR/crane" version)"
-"$DIR/oras" version | head -n 1
+"$DIR/oras" version | sed -n 1p
 echo "kubeconform $("$DIR/kubeconform" -v)"
 echo "installed the CI tools in $DIR"
