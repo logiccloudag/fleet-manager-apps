@@ -329,6 +329,15 @@ on any failure. The stages for each app are:
    the stage. No stub `compose.yaml` is committed: it would make bart's
    compose lints pass vacuously.
 
+   bart's lint "parameters -> compose ${env}" ignores `Target.components`:
+   it expects every pointer of every profile in `compose.yaml`, also the
+   Helm value paths of targets that name only the helm component. An app
+   with both profiles therefore always gets this failure. The script
+   tolerates it only when every pointer it lists belongs to a target that
+   names helm components only; a listed compose pointer, or any other
+   pointer, fails the stage. The compose targets are checked by the
+   "compose package" stage.
+
    bart's bundled Margo JSON Schema types the items of
    `configuration.schema` as the base `Schema` (`name`, `dataType`), not as
    its subtypes, so it rejects every validation rule there, including
