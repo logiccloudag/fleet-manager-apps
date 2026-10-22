@@ -36,9 +36,12 @@ scripts/mirror-charts.sh  publishes the pinned charts to margo-charts
 scripts/publish-compose.sh  publishes the compose packages to margo-compose
 scripts/verify-public.sh  checks that everything pulls without credentials
 scripts/retention.sh      deletes old package versions
+scripts/upstream-check.py finds newer upstream versions, regenerates an app
+scripts/youtrack-issue.py opens the issue of a major bump or a red gate
+scripts/tests/            unit tests of the upstream check
 scripts/lib/              helpers of the scripts
 scripts/ci/               tool installer and kind setup of the workflows
-.github/workflows/        check, publish, retention
+.github/workflows/        check, publish, retention, upstream-check
 ```
 
 Each app has its own directory. Each description has one `helm` deployment
@@ -469,6 +472,59 @@ Any change under `helm-<app>/compose/` needs a new compose `revision` in
 `app/margo.yaml` (minor for a feature, patch for a fix), a new
 `metadata.version` and release notes. Publishing a changed package under an
 existing revision fails.
+
+## Weekly upstream check
+
+The `upstream-check` workflow (Mondays 05:00 UTC, FM-1631) looks for newer
+stable upstream versions of every pin:
+
+| Pin | Upstream source |
+| --- | --- |
+| mirror chart (Grafana, Node-RED) | the chart's OCI tags |
+| wrapper chart (InfluxDB) | its dependency in the Helm repository index |
+| image, `track` `tags` (InfluxDB, Mosquitto, Traefik) | the newest upstream tag of the same shape: same prefix and suffix (`2.9.1-alpine`, `v3.7.14`), no `rc`, `alpha`, `beta`, `dev` or nightly tags |
+| image, `track` `chart` (Grafana, Node-RED) | the `appVersion` of the new mirror chart, with the tag's prefix and suffix |
+
+The highest bump of an app decides what happens (`scripts/upstream-check.py
+plan`):
+
+- **Patch or minor:** `scripts/upstream-check.py regenerate` rewrites the
+  app. That covers the pins, every image reference, the chart version of a
+  wrapper or local chart, the revisions, the compose revision when an image
+  changed, `metadata.version`, the release notes and the README table. The
+  full gate (`scripts/check.sh --cluster --compose <app>`) then runs with
+  the new images in a local registry. Green: a commit `chore(<id>):
+  upstream <old> → <new>` is pushed, and `publish.yml` is dispatched (a push
+  with the `GITHUB_TOKEN` starts no workflow). Red: the changes are undone
+  and an issue is opened, as for a major bump.
+- **Major, or a red gate:** nothing is committed or published.
+  `scripts/youtrack-issue.py` opens a Task in YouTrack project FM. Its
+  summary is `fleet-manager-apps: plan <id> upgrade <old> → <new>`, its
+  description holds the plan and the gate log, it is tagged `margo-apps`
+  and it goes on the current sprint. No second issue is opened while one
+  with the same summary is not Done.
+
+The run summary lists, per app: up to date, regenerated, or issue created
+or existing (with link).
+
+By hand, from the Actions tab, `workflow_dispatch` takes these inputs:
+
+- `dry_run`: on by default. It reports the plan and runs the duplicate
+  search only.
+- `publish`;
+- `issue_tag`: a test tag for a forced test;
+- `apps`: a subset of the apps.
+
+Locally:
+
+```sh
+scripts/upstream-check.py plan /tmp/plan.json        # needs crane and helm
+python3 -m unittest discover -s scripts/tests -v     # version arithmetic
+```
+
+**Once, by a human:** create the repository secret `YOUTRACK_TOKEN`, a
+permanent YouTrack token that may create issues in project FM, tag them and
+add them to the board. Without it the workflow fails; it does not skip.
 
 ## Publishing
 
