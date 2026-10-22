@@ -5,12 +5,15 @@ Subcommands:
 
   plan <plan.json> [app-dir...]
       Finds the newest stable upstream version of every pin and writes the
-      plan. Per app the action is:
-        none        everything is up to date
-        regenerate  a patch or minor bump: scripts/upstream-check.py
-                    regenerate rewrites the app, the gate decides
-        issue       a major bump: a human plans the upgrade
-      Prints one line per app.
+      plan. Per component it records the newest version within the current
+      major (`latest`, the target of regenerate) and, when there is one,
+      the newest major version (`major`). Per app (FM-1731):
+        regenerate  true when a component has a newer version within its
+                    major: scripts/upstream-check.py regenerate rewrites the
+                    app, the gate decides
+        issue       true when a component has a new major version: a human
+                    plans that upgrade
+      Both can be true. Prints one line per app.
 
   regenerate <plan.json> <app-dir>
       Applies the planned bump of one app to the working tree: the pins
@@ -169,48 +172,55 @@ def load_yaml(path):
 
 # -------------------------------------------------------------------- plan
 
+def version_component(base, current, candidates):
+    """A component dict with the within-major target and the major, if any."""
+    target = versions.newest(current, candidates, same_major=True)
+    overall = versions.newest(current, candidates)
+    major = overall if versions.classify(current, overall) == "major" else None
+    return dict(base, current=current, latest=target, bump=versions.classify(current, target), major=major)
+
+
 def plan_app(chart_row, image_rows):
     app = chart_row["app"]
     components = []
-    chart_latest = None
+    chart = None
     if chart_row["type"] == "mirror":
-        latest = versions.newest(chart_row["version"], chart_candidates(chart_row["source"]))
-        chart_latest = latest
-        components.append({
-            "kind": "chart", "name": chart_row["chart"], "source": chart_row["source"],
-            "current": chart_row["version"], "latest": latest,
-            "bump": versions.classify(chart_row["version"], latest),
-        })
+        chart = version_component({"kind": "chart", "name": chart_row["chart"], "source": chart_row["source"]},
+                                  chart_row["version"], chart_candidates(chart_row["source"]))
+        components.append(chart)
     elif chart_row["type"] == "wrapper":
         dep = wrapper_dependency(app)
         source = f"{dep['repository']}#{dep['name']}"
-        latest = versions.newest(str(dep["version"]), chart_candidates(source))
-        components.append({
-            "kind": "dependency", "name": dep["name"], "source": source,
-            "current": str(dep["version"]), "latest": latest,
-            "bump": versions.classify(str(dep["version"]), latest),
-        })
+        components.append(version_component({"kind": "dependency", "name": dep["name"], "source": source},
+                                             str(dep["version"]), chart_candidates(source)))
     for img in image_rows:
+        base = {"kind": "image", "name": img["name"], "upstream": img["upstream"]}
         if img.get("track") == "chart":
-            if chart_row["type"] != "mirror":
+            if chart is None:
                 die(f"{img['name']}: track chart needs a mirror chart, {app} has {chart_row['type']}")
-            if chart_latest == chart_row["version"]:
+            if chart["bump"] == "none":
                 latest = img["tag"]
             else:
-                app_version = chart_app_version(chart_row["source"], chart_latest)
-                latest = versions.retag(img["tag"], app_version)
+                latest = versions.retag(img["tag"], chart_app_version(chart_row["source"], chart["latest"]))
+            comp = dict(base, current=img["tag"], latest=latest, bump=versions.classify(img["tag"], latest), major=None)
+            if comp["bump"] == "major":
+                # The within-major chart brings a new major of the image: no
+                # automatic update, the image major goes to the issue.
+                comp.update(latest=img["tag"], bump="none", major=latest)
+                chart.update(latest=chart["current"], bump="none", major=chart["major"] or chart["latest"])
         elif img.get("track") == "tags":
-            latest = versions.newest(img["tag"], oci_tags(img["upstream"]))
+            comp = version_component(base, img["tag"], oci_tags(img["upstream"]))
         else:
             die(f"{img['name']}: unknown track {img.get('track')!r} in scripts/images.tsv")
-        components.append({
-            "kind": "image", "name": img["name"], "upstream": img["upstream"],
-            "current": img["tag"], "latest": latest, "bump": versions.classify(img["tag"], latest),
-        })
+        components.append(comp)
     bump = versions.max_bump(*[c["bump"] for c in components])
-    action = {"none": "none", "major": "issue"}.get(bump, "regenerate")
+    regenerate = bump != "none"
+    issue = any(c.get("major") for c in components)
+    action = {(False, False): "none", (True, False): "regenerate",
+              (False, True): "issue", (True, True): "regenerate+issue"}[(regenerate, issue)]
     return {"app": app, "id": load_yaml(os.path.join(ROOT, app, "app", "margo.yaml"))["id"],
-            "bump": bump, "action": action, "components": components}
+            "bump": bump, "regenerate": regenerate, "issue": issue, "action": action,
+            "components": components}
 
 
 def cmd_plan(out, apps):
@@ -223,8 +233,11 @@ def cmd_plan(out, apps):
         rows = [i for i in images if row["app"] in i["apps"].split(",")]
         entry = plan_app(row, rows)
         result.append(entry)
-        changes = ", ".join(f"{c['kind']} {c['name']} {c['current']} -> {c['latest']} ({c['bump']})"
-                            for c in entry["components"] if c["bump"] != "none")
+        changes = ", ".join(
+            [f"{c['kind']} {c['name']} {c['current']} -> {c['latest']} ({c['bump']})"
+             for c in entry["components"] if c["bump"] != "none"]
+            + [f"{c['kind']} {c['name']} major {c['major']} available"
+               for c in entry["components"] if c.get("major")])
         print(f"{entry['app']}\t{entry['action']}\t{changes or 'up to date'}")
     with open(out, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
@@ -351,8 +364,8 @@ def cmd_regenerate(plan_path, app):
         entry = next((e for e in json.load(f) if e["app"] == app), None)
     if entry is None:
         die(f"{app} is not in {plan_path}")
-    if entry["action"] != "regenerate":
-        die(f"{app}: planned action is {entry['action']}, not regenerate")
+    if not entry.get("regenerate"):
+        die(f"{app}: the plan has no update within the current major for {app}")
     level = entry["bump"]
     margo_path = os.path.join(ROOT, app, "app", "margo.yaml")
     doc = load_yaml(margo_path)

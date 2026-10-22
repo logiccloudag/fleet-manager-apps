@@ -54,6 +54,14 @@ class NewestTest(unittest.TestCase):
         for tag in ["4.2.0-beta.1", "4.2.0-alpha", "4.2.0-nightly", "4.2.0-dev", "4.2.0rc1", "4.2.0-pre"]:
             self.assertEqual(versions.newest("4.1.2", [tag]), "4.1.2", tag)
 
+    def test_same_major_stays_in_the_current_major(self):
+        """FM-1731: grafana 13.2.7 gets 13.7.0 while 14.0.1 goes to an issue."""
+        tags = ["13.2.7", "13.2.8", "13.7.0", "14.0.0", "14.0.1", "14.1.0-beta.1"]
+        self.assertEqual(versions.newest("13.2.7", tags, same_major=True), "13.7.0")
+        self.assertEqual(versions.newest("13.2.7", tags), "14.0.1")
+        self.assertEqual(versions.newest("v3.7.14", ["v3.7.16", "v4.0.0"], same_major=True), "v3.7.16")
+        self.assertEqual(versions.newest("2.9.1-alpine", ["3.0.0-alpine"], same_major=True), "2.9.1-alpine")
+
     def test_no_candidates(self):
         self.assertEqual(versions.newest("1.0.0", []), "1.0.0")
 
