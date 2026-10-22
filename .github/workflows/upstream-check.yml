@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           # shellcheck disable=SC2086 # APPS is a space separated list
           scripts/upstream-check.py plan "$RUNNER_TEMP/plan.json" $APPS
-          echo "REGENERATE=$(jq '[.[] | select(.action == "regenerate")] | length' "$RUNNER_TEMP/plan.json")" >>"$GITHUB_ENV"
+          echo "REGENERATE=$(jq '[.[] | select(.regenerate == true)] | length' "$RUNNER_TEMP/plan.json")" >>"$GITHUB_ENV"
 
       - name: Local registry with the pinned images, kind cluster
         if: env.REGENERATE != '0' && (github.event_name == 'schedule' || !inputs.dry_run)

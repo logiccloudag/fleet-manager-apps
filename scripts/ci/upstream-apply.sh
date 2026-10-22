@@ -82,6 +82,19 @@ majors() { # <app>: markdown list of the new major versions
     | "- \(.kind) `\(.name)`: \(.current) → \(.major) (major)"' "$PLAN"
 }
 
+# A missing gate environment is a broken runner, not a red gate: fail the
+# job instead of opening a misleading issue.
+if [ "$DRY_RUN" != true ] && [ "$(jq '[.[] | select(.regenerate == true)] | length' "$PLAN")" != 0 ]; then
+  curl -fsS "http://127.0.0.1:$PORT/v2/" >/dev/null 2>&1 || {
+    echo "ERROR: the gate registry on port $PORT is not running (scripts/ci/gate-setup.sh)" >&2
+    exit 1
+  }
+  kubectl get nodes >/dev/null 2>&1 || {
+    echo "ERROR: no kind cluster for the gate (scripts/ci/gate-setup.sh)" >&2
+    exit 1
+  }
+fi
+
 COMMITS=0
 for app in $(jq -r '.[].app' "$PLAN"); do
   id="$(jq -r --arg a "$app" '.[] | select(.app == $a) | .id' "$PLAN")"
