@@ -65,7 +65,7 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | `influxdb` | `influxdb2-restricted` 0.2.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
 | `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
-| `traefik` | `traefik-restricted` 0.2.0 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.14, copy of `docker.io/library/traefik:v3.7.14` (MIT) | local |
+| `traefik` | `traefik-restricted` 0.2.1 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
 
 The compose package of `grafana`, `influxdb`, `mosquitto` and `node-red` is
 version 1.0.0. Traefik has no compose profile: it is a Kubernetes ingress
