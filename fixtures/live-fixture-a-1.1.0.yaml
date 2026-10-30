@@ -50,6 +50,24 @@ deploymentProfiles:
             - arm64
         memory: 512Mi
         storage: 5Gi
+  - type: compose
+    id: compose-modular
+    components:
+      - name: node-red-compose
+        properties:
+          repository: oci://ghcr.io/logiccloudag/margo-compose/node-red
+          revision: "1.0.0"
+          wait: true
+          timeout: "10m0s"
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.5
+          architectures:
+            - amd64
+            - arm64
+        memory: 512Mi
+        storage: 5Gi
 parameters:
   servicePort:
     value: "1880"
