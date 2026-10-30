@@ -1,9 +1,8 @@
-apiVersion: margo/v1alpha1
-kind: ApplicationDescription
+apiVersion: v1
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.1.0"
+  version: "1.2.0"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
@@ -35,14 +34,15 @@ deploymentProfiles:
           revision: "0.2.0"
           wait: true
           timeout: "10m0s"
-    requiredResources:
-      cpu:
-        cores: 0.5
-        architectures:
-          - amd64
-          - arm64
-      memory: 1Gi
-      storage: 8Gi
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.5
+          architectures:
+            - amd64
+            - arm64
+        memory: 1Gi
+        storage: 8Gi
   - type: compose
     id: compose
     components:
@@ -54,14 +54,15 @@ deploymentProfiles:
           revision: "1.0.0"
           wait: true
           timeout: "10m0s"
-    requiredResources:
-      cpu:
-        cores: 0.5
-        architectures:
-          - amd64
-          - arm64
-      memory: 1Gi
-      storage: 8Gi
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.5
+          architectures:
+            - amd64
+            - arm64
+        memory: 1Gi
+        storage: 8Gi
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. The typed Pod Security
 # settings (non-root UID 1000, seccomp RuntimeDefault, no privilege

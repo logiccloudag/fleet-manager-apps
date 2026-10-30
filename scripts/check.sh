@@ -126,6 +126,11 @@ check_bart() {
   # rule (allowEmpty, minLength, ...): the rules are checked by
   # margo_check.py, and bart validates a copy without them, so its icon,
   # release-notes and architecture checks still run.
+  # TEMPORARY (FM-1839): the pinned bart bundles the Margo rc2 schema, so the
+  # same copy is also rewritten into the rc2 shape (kind, rc2 apiVersion,
+  # requiredResources from deviceConstraints.capacityRequirements). Remove
+  # this once a mirrored bart supports rc3. The fleet-manager stage checks
+  # the real rc3 document.
   rm -rf "$app" && cp -R "$REPO_ROOT/$dir" "$app"
   python3 "$PY" schema-rules "$REPO_ROOT/$dir/app/margo.yaml" "$app/app/margo.yaml" || rules=1
   docker run --rm -u "$(id -u):$(id -g)" -v "$app:/w" -w /w "$BART_IMAGE" validate >"$out" 2>&1 || rc=$?

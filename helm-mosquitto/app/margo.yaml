@@ -1,9 +1,8 @@
-apiVersion: margo/v1alpha1
-kind: ApplicationDescription
+apiVersion: v1
 id: mosquitto
 metadata:
   name: Eclipse Mosquitto
-  version: "2.1.0"
+  version: "2.2.0"
   description: >-
     Eclipse Mosquitto 2.1 MQTT broker (MQTT 3.1, 3.1.1 and 5.0) from the
     official eclipse-mosquitto image, installed from mosquitto-restricted, a
@@ -35,14 +34,15 @@ deploymentProfiles:
           revision: "0.2.0"
           wait: true
           timeout: "10m0s"
-    requiredResources:
-      cpu:
-        cores: 0.25
-        architectures:
-          - amd64
-          - arm64
-      memory: 128Mi
-      storage: 1Gi
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.25
+          architectures:
+            - amd64
+            - arm64
+        memory: 128Mi
+        storage: 1Gi
   - type: compose
     id: compose
     components:
@@ -54,14 +54,15 @@ deploymentProfiles:
           revision: "1.0.0"
           wait: true
           timeout: "10m0s"
-    requiredResources:
-      cpu:
-        cores: 0.25
-        architectures:
-          - amd64
-          - arm64
-      memory: 128Mi
-      storage: 1Gi
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.25
+          architectures:
+            - amd64
+            - arm64
+        memory: 128Mi
+        storage: 1Gi
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. The chart reads every
 # value string-safely: "false" switches a boolean off, numbers may be strings.

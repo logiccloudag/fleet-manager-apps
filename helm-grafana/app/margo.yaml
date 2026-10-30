@@ -1,9 +1,8 @@
-apiVersion: margo/v1alpha1
-kind: ApplicationDescription
+apiVersion: v1
 id: grafana
 metadata:
   name: Grafana
-  version: "1.2.0"
+  version: "1.3.0"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
@@ -35,14 +34,15 @@ deploymentProfiles:
           revision: "13.7.0"
           wait: true
           timeout: "10m0s"
-    requiredResources:
-      cpu:
-        cores: 0.5
-        architectures:
-          - amd64
-          - arm64
-      memory: 512Mi
-      storage: 5Gi
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.5
+          architectures:
+            - amd64
+            - arm64
+        memory: 512Mi
+        storage: 5Gi
   - type: compose
     id: compose
     components:
@@ -54,14 +54,15 @@ deploymentProfiles:
           revision: "1.1.0"
           wait: true
           timeout: "10m0s"
-    requiredResources:
-      cpu:
-        cores: 0.5
-        architectures:
-          - amd64
-          - arm64
-      memory: 512Mi
-      storage: 5Gi
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.5
+          architectures:
+            - amd64
+            - arm64
+        memory: 512Mi
+        storage: 5Gi
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. Helm treats every
 # non-empty string as true, so a chart boolean that defaults to true can only

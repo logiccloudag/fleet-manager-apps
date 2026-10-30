@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.0
+
+- Margo rc3 ApplicationDescription (apiVersion v1, deviceConstraints); no change to the chart or images.
+
 ## 1.1.0
 
 - New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/node-red` 1.0.0. The service port (the host port) applies to it. The editor has no login: publish the port only on a trusted network.

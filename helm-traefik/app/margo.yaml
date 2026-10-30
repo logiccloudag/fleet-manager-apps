@@ -1,9 +1,8 @@
-apiVersion: margo/v1alpha1
-kind: ApplicationDescription
+apiVersion: v1
 id: traefik
 metadata:
   name: Traefik
-  version: "1.1.1"
+  version: "1.2.0"
   description: >-
     Traefik 3.7 ingress controller from the official traefik image, installed
     from traefik-restricted, a small logiccloud chart. It serves the
@@ -37,14 +36,15 @@ deploymentProfiles:
           revision: "0.2.1"
           wait: true
           timeout: "5m0s"
-    requiredResources:
-      cpu:
-        cores: 0.1
-        architectures:
-          - amd64
-          - arm64
-      memory: 128Mi
-      storage: 64Mi
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.1
+          architectures:
+            - amd64
+            - arm64
+        memory: 128Mi
+        storage: 64Mi
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. The chart reads every
 # value string-safely: numbers may be strings.
