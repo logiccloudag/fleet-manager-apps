@@ -1,0 +1,60 @@
+apiVersion: v1
+id: live-fixture-b
+metadata:
+  name: "Live Fixture B"
+  version: "1.0.0"
+  description: >-
+    WFM live-suite fixture (FM-1839). Not catalog content.
+  catalog:
+    organization:
+      - name: logiccloud
+        site: https://logiccloud.io
+    application:
+      tagline: Fixture for the WFM live suites.
+      tags:
+        - fixture
+deploymentProfiles:
+  - type: helm
+    id: kubernetes
+    components:
+      - name: node-red
+        properties:
+          repository: oci://ghcr.io/logiccloudag/margo-charts/node-red
+          revision: "0.40.2"
+          wait: true
+          timeout: "10m0s"
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.5
+          architectures:
+            - amd64
+            - arm64
+        memory: 512Mi
+        storage: 5Gi
+parameters:
+  servicePort:
+    value: "1880"
+    targets:
+      - pointer: service.port
+        components: [node-red]
+  memoryRequest:
+    value: "128Mi"
+    targets:
+      - pointer: resources.requests.memory
+        components: [node-red]
+configuration:
+  sections:
+    - name: Service and resources
+      settings:
+        - parameter: servicePort
+          name: Service port
+          schema: port
+        - parameter: memoryRequest
+          name: Memory request
+          schema: quantity
+  schema:
+    - name: port
+      dataType: string
+    - name: quantity
+      dataType: string
