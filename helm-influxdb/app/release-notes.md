@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.0
+
+- Margo rc3 ApplicationDescription (apiVersion v1, deviceConstraints); no change to the chart or images.
+
 ## 1.1.0
 
 - New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/influxdb` 1.0.0. The initial setup settings and the service port (the host port) apply to it. An empty administrator password is generated at the first start and stored in `/etc/influxdb2/generated-admin-password` in the container.

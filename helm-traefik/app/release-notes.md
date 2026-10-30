@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.0
+
+- Margo rc3 ApplicationDescription (apiVersion v1, deviceConstraints); no change to the chart or images.
+
 ## 1.1.1
 
 - Image: `ghcr.io/logiccloudag/margo-images/traefik:v3.7.16`, a copy of `docker.io/library/traefik:v3.7.16` (v3.7.14 before).

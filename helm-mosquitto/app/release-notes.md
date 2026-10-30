@@ -1,5 +1,9 @@
 # Release Notes
 
+## 2.2.0
+
+- Margo rc3 ApplicationDescription (apiVersion v1, deviceConstraints); no change to the chart or images.
+
 ## 2.1.0
 
 - New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/mosquitto` 1.0.0. The listener port, service port (the host port) and anonymous access apply to it. The new settings user name and password (compose only) create a password file with one user in memory; a compose package carries no Secret.

@@ -55,7 +55,7 @@ OCI_REPOSITORY_PATTERN = re.compile(r"^oci://.+")
 SEMVER_REVISION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
-    r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
+    r"(?:_([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"  # build metadata uses "_", never "+" (FM-1703)
 )
 SEMVER_LOOSE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$")
 # bart's schema for components[].properties.timeout
@@ -67,6 +67,12 @@ ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 COMPOSE_VARIABLE = re.compile(r"(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-?+])([^}]*))?\}")
 COMPOSE_BARE_VARIABLE = re.compile(r"(?<!\$)\$([A-Za-z_][A-Za-z0-9_]*)")
 PROFILE_TYPES = ("helm", "compose")
+# Margo rc3 (FM-1548, FM-1839): apiVersion "v1", no kind.
+RC3_API_VERSION = "v1"
+RC3_CPU_ARCHITECTURES = ("amd64", "arm64", "arm", "riscv64", "other")
+RC3_SELECTOR_OPERATORS = ("In", "NotIn", "Exists", "DoesNotExist", "Gt", "Lt", "ContainsAll", "ContainsAny")
+MEMORY_PATTERN = re.compile(r"^[0-9]+(Mi|Gi|Ki)$")
+STORAGE_PATTERN = re.compile(r"^[0-9]+(Mi|Gi|Ki|Ti|Pi|Ei)$")
 
 # kubernetes-agent internal/deploy/helm.go clusterScopedKinds
 CLUSTER_SCOPED_KINDS = {
@@ -200,6 +206,26 @@ def schema_subtypes(entry):
             "double": ["double"]}.get(data_type, [])
 
 
+# TEMPORARY (FM-1839): the pinned bart bundles the Margo rc2 schema. It
+# validates a copy of the rc3 document in the rc2 shape.
+BART_RC2_API_VERSION = "margo/v1alpha1"
+
+
+def to_rc2_shape(doc):
+    """Rewrites an rc3 ApplicationDescription in place into the rc2 shape that
+    bart's bundled schema expects: kind, the rc2 apiVersion and
+    requiredResources (from deviceConstraints.capacityRequirements). The
+    eligibilityRules have no rc2 form and are dropped; fleet-manager rules
+    check them."""
+    doc["apiVersion"] = BART_RC2_API_VERSION
+    doc["kind"] = "ApplicationDescription"
+    for profile in profiles_of(doc):
+        constraints = profile.pop("deviceConstraints", None)
+        capacity = constraints.get("capacityRequirements") if isinstance(constraints, dict) else None
+        if capacity:
+            profile["requiredResources"] = capacity
+
+
 def cmd_schema_rules(margo_path, out_path):
     """bart's bundled Margo JSON Schema types configuration.schema items as
     the base Schema (name and dataType, additionalProperties false), never
@@ -234,8 +260,11 @@ def cmd_schema_rules(margo_path, out_path):
         for k in rules:
             del entry[k]
         stripped += 1
+    to_rc2_shape(doc)
     with open(out_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+    print("  INFO  bart validates an rc2-shaped copy (kind, rc2 apiVersion, requiredResources); "
+          "temporary until bart bundles the rc3 schema (FM-1839)")
     if stripped:
         print(f"  INFO  bart validates a copy without the rules of {stripped} schema entr"
               f"{'y' if stripped == 1 else 'ies'} (its bundled schema lacks the subtypes)")
@@ -243,21 +272,112 @@ def cmd_schema_rules(margo_path, out_path):
 
 # ------------------------------------------------------------ fleet-manager
 
+def check_profile_constraints(profile, path):
+    """rc3 deviceConstraints of one profile (checkDeviceConstraints of
+    libs/common, FM-1548). requiredResources is the rc2 vocabulary."""
+    if "requiredResources" in profile:
+        fail(f"{path}.requiredResources is the Margo rc2 vocabulary; rc3 uses deviceConstraints")
+    if "deviceConstraints" not in profile:
+        return
+    violations = []
+    constraints = profile["deviceConstraints"]
+    if not isinstance(constraints, dict):
+        violations.append(("", "must be an object"))
+    else:
+        if "capacityRequirements" in constraints:
+            check_capacity(constraints["capacityRequirements"], "capacityRequirements", violations)
+        rules = constraints.get("eligibilityRules")
+        if "eligibilityRules" in constraints:
+            if not isinstance(rules, list):
+                violations.append(("eligibilityRules", "must be a list"))
+            else:
+                for i, rule in enumerate(rules):
+                    rpath = f"eligibilityRules[{i}]"
+                    if not isinstance(rule, dict):
+                        violations.append((rpath, "must be an object"))
+                        continue
+                    if "propertySelector" not in rule and "labelSelector" not in rule:
+                        violations.append((rpath, "needs a propertySelector or a labelSelector"))
+                    for kind in ("propertySelector", "labelSelector"):
+                        if kind in rule:
+                            check_selector(rule[kind], f"{rpath}.{kind}", kind == "propertySelector", violations)
+    if not violations:
+        ok(f"{path}.deviceConstraints valid")
+    for vpath, message in violations:
+        fail(f"{path}.deviceConstraints{'.' + vpath if vpath else ''} {message}")
+
+
+def check_capacity(value, path, out):
+    if not isinstance(value, dict):
+        out.append((path, "must be an object"))
+        return
+    if "cpu" in value:
+        cpu = value["cpu"]
+        if not isinstance(cpu, dict):
+            out.append((f"{path}.cpu", "must be an object"))
+        else:
+            cores = cpu.get("cores")
+            if isinstance(cores, bool) or not isinstance(cores, (int, float)):
+                out.append((f"{path}.cpu.cores", "is required and must be a number"))
+            if "architectures" in cpu:
+                archs = cpu["architectures"]
+                if not isinstance(archs, list) or not all(a in RC3_CPU_ARCHITECTURES for a in archs):
+                    out.append((f"{path}.cpu.architectures", f"must be a list of {', '.join(RC3_CPU_ARCHITECTURES)}"))
+    for key, pattern in (("memory", MEMORY_PATTERN), ("storage", STORAGE_PATTERN)):
+        if key in value and (not isinstance(value[key], str) or not pattern.match(value[key])):
+            out.append((f"{path}.{key}", f"must match {pattern.pattern}"))
+
+
+def check_selector(value, path, json_pointer_keys, out):
+    if not isinstance(value, dict):
+        out.append((path, "must be an object"))
+        return
+    expressions = value.get("matchExpressions")
+    if not isinstance(expressions, list):
+        out.append((f"{path}.matchExpressions", "is required and must be a list"))
+        return
+    for i, expr in enumerate(expressions):
+        at = f"{path}.matchExpressions[{i}]"
+        if not isinstance(expr, dict):
+            out.append((at, "must be an object"))
+            continue
+        key = expr.get("key")
+        if not isinstance(key, str) or not key:
+            out.append((f"{at}.key", "is required and must be a string"))
+        elif json_pointer_keys and not key.startswith("/"):
+            out.append((f"{at}.key", "must be a JSON Pointer (RFC 6901), e.g. /cpus"))
+        operator = expr.get("operator")
+        if operator not in RC3_SELECTOR_OPERATORS:
+            out.append((f"{at}.operator", f"must be one of {', '.join(RC3_SELECTOR_OPERATORS)}"))
+            continue
+        values = expr.get("values")
+        if values is not None and not isinstance(values, list):
+            out.append((f"{at}.values", "must be a list"))
+        if operator in ("In", "NotIn", "Gt", "Lt") and not isinstance(values, list):
+            out.append((f"{at}.values", f"is required for operator {operator}"))
+        item_selector = expr.get("itemSelector")
+        if operator in ("ContainsAll", "ContainsAny") and item_selector is None:
+            out.append((f"{at}.itemSelector", f"is required for operator {operator}"))
+        if item_selector is not None:
+            check_selector(item_selector, f"{at}.itemSelector", True, out)
+
+
 def cmd_fleet_manager(margo_path, app_dir, chart, version, registry, compose_registry):
     doc = load_yaml(margo_path)
     if not isinstance(doc, dict):
         fail("margo.yaml is not a YAML mapping")
         return
 
-    # Header (validateHeader)
-    if doc.get("apiVersion"):
-        ok(f"apiVersion present ({doc['apiVersion']})")
+    # Header (validateHeader): only a Margo rc3 document is accepted.
+    if "kind" in doc:
+        fail(f"kind must be absent: a Margo rc3 ApplicationDescription has no kind (got {doc.get('kind')!r}; "
+             "kind: ApplicationDescription is rc2 and is rejected with RC2_NOT_SUPPORTED)")
     else:
-        fail("apiVersion is required")
-    if doc.get("kind") == "ApplicationDescription":
-        ok("kind is ApplicationDescription")
+        ok("no kind (Margo rc3)")
+    if doc.get("apiVersion") == RC3_API_VERSION:
+        ok(f"apiVersion is {RC3_API_VERSION}")
     else:
-        fail(f"kind must be ApplicationDescription (got {doc.get('kind')!r})")
+        fail(f"apiVersion must be {RC3_API_VERSION!r} (got {doc.get('apiVersion')!r})")
     app_id = doc.get("id")
     if isinstance(app_id, str) and ID_PATTERN.match(app_id):
         ok(f"top-level id {app_id!r} matches ^[a-z0-9-]{{1,200}}$")
@@ -314,6 +434,7 @@ def cmd_fleet_manager(margo_path, app_dir, chart, version, registry, compose_reg
         if not pid or pid in seen_ids:
             fail(f"{path}.id must be present and unique (got {pid!r})")
         seen_ids.add(pid)
+        check_profile_constraints(profile, path)
         components = profile.get("components") or []
         if not components:
             fail(f"{path}.components must not be empty")
@@ -587,7 +708,7 @@ def check_images(where, images, refs, registry):
 def cmd_rendered(manifest_path, margo_path, images_tsv=None, registry=None, app_dir_name=None):
     archs = []
     for profile in profiles_of(load_yaml(margo_path)):
-        archs += (((profile.get("requiredResources") or {}).get("cpu") or {}).get("architectures") or [])
+        archs += ((((profile.get("deviceConstraints") or {}).get("capacityRequirements") or {}).get("cpu") or {}).get("architectures") or [])
     with open(manifest_path, encoding="utf-8") as f:
         docs = [d for d in yaml.safe_load_all(f) if isinstance(d, dict) and d.get("kind")]
     if not docs:

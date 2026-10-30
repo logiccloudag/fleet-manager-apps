@@ -1,14 +1,16 @@
 # fleet-manager-apps
 
 A catalog of Margo applications for fleet-manager. Each app is a Margo
-`ApplicationDescription` with a Helm profile, which devices running the
+Margo rc3 `ApplicationDescription` (`apiVersion: v1`) with a Helm profile, which devices running the
 [kubernetes-agent](https://logiccloud.youtrack.cloud/projects/KA) install.
 Grafana, InfluxDB, Mosquitto and Node-RED also have a compose profile for
 devices that run Docker Compose (see "Compose profile").
 
 fleet-manager reads this repository as a **Git registry**: in the UI open
 `/<tenant>/repositories/git-registries` (NBI `POST /api/v1/registries/git`).
-The sync imports every `*.yaml` file whose `kind` is `ApplicationDescription`.
+The sync imports every `*.yaml` file that is a Margo rc3 `ApplicationDescription`:
+`apiVersion: v1`, no `kind`, with `deploymentProfiles`. fleet-manager rejects
+an rc2 file (`kind: ApplicationDescription`) with `RC2_NOT_SUPPORTED`.
 The file name does not matter. fleet-manager never pulls a chart or a
 compose package: the device pulls it from the OCI reference in the
 description.
@@ -274,7 +276,7 @@ constraints 1 to 7; `--cluster` also exercises 8 on the test cluster.
    inside that namespace.
 7. **Storage and scheduling.** PVCs use the cluster's default StorageClass.
    Each volume size is a parameter. No pod may be pinned away from an
-   architecture listed in `requiredResources.cpu.architectures` (amd64 and
+   architecture listed in `deviceConstraints.capacityRequirements.cpu.architectures` (amd64 and
    arm64 here).
 8. **Images.** The device must be able to pull the images. They are public
    copies on `ghcr.io/logiccloudag/margo-images`, pulled by digest, so no
@@ -350,7 +352,17 @@ on any failure. The stages for each app are:
    the subtypes of bart's own schema (`TextValidationSchema`,
    `NumericIntegerValidationSchema`, ...), and bart validates a copy of
    `margo.yaml` without them, so its icon, release-notes and architecture
-   checks still run. To see bart's own output:
+   checks still run.
+
+   Temporary (FM-1839): the pinned bart bundles the Margo rc2 schema, not
+   rc3. The same copy is therefore also rewritten into the rc2 shape: it
+   gets `kind: ApplicationDescription`, the rc2 `apiVersion`
+   `margo/v1alpha1` and `requiredResources` (from
+   `deviceConstraints.capacityRequirements`). bart's icon, release-notes
+   and architecture checks still run. The rc3 document itself is checked
+   by the "fleet-manager rules" stage. Remove the rewrite when a mirrored
+   bart supports rc3. To see bart's own output on the rc3 file (its schema
+   check fails there by design):
 
    ```sh
    docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/helm-grafana:/w" -w /w cr.flecs.tech/flecs/bart:latest validate
@@ -358,7 +370,10 @@ on any failure. The stages for each app are:
 
 2. **fleet-manager rules.** These are the ingest rules of
    `margo-manifest-parser.service.ts`:
-   - top-level `id`, `kind`, `metadata.name`, `version` and `catalog`;
+   - `apiVersion: v1`, no `kind`, top-level `id`, `metadata.name`, `version`
+     and `catalog`;
+   - `deviceConstraints` (capacity patterns, selector operators, JSON Pointer
+     keys); `requiredResources` is an error;
    - profile `type: helm` or `compose`, `oci://` repository, SemVer
      revision;
    - parameter keys, and parameters with targets.
