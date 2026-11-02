@@ -2,7 +2,7 @@ apiVersion: v1
 id: traefik
 metadata:
   name: Traefik
-  version: "1.2.0"
+  version: "1.2.1"
   description: >-
     Traefik 3.7 ingress controller from the official traefik image, installed
     from traefik-restricted, a small logiccloud chart. It serves the
@@ -33,7 +33,7 @@ deploymentProfiles:
         properties:
           # The chart in helm-traefik/chart.
           repository: oci://ghcr.io/logiccloudag/margo-charts/traefik-restricted
-          revision: "0.2.1"
+          revision: "0.2.2"
           wait: true
           timeout: "5m0s"
     deviceConstraints:

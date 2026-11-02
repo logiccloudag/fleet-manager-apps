@@ -7,10 +7,10 @@ image:
   # The copy of docker.io/library/traefik in the catalog's image registry
   # (scripts/images.tsv).
   repository: ghcr.io/logiccloudag/margo-images/traefik
-  tag: v3.7.16
+  tag: v3.7.17
   # Multi-arch index digest of v3.7.14 (amd64, arm64, arm, ...), the same as
   # upstream. When set, the image is pulled by digest.
-  digest: sha256:22a759fb803abb5c3a7ba5d5a55a201c5fb0fc8993d5c72c47a89075e64f1953
+  digest: sha256:30ff62491aacdb862ceb8c9edcf2627da638d7deafdd4b6dab32fe34f8aa3e90
   pullPolicy: IfNotPresent
 
 service:
