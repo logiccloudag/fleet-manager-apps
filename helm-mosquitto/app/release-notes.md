@@ -1,5 +1,11 @@
 # Release Notes
 
+## 2.2.0-openshift.1
+
+- Chart: mosquitto-restricted 0.3.0-openshift.1. The fixed `runAsUser`, `runAsGroup` and `fsGroup` (1883) are removed, because OpenShift's restricted SCC rejects them. OpenShift assigns these IDs from the namespace's UID range. The init container runs with the broker's UID, so the password file stays owned by the broker.
+
+- OpenShift only: the images of InfluxDB, Mosquitto, Node-RED and Traefik do not declare a numeric non-root user, so without OpenShift's UID assignment the pod fails `runAsNonRoot` on other Kubernetes distributions. Use the `main` catalog there.
+
 ## 2.1.0
 
 - New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/mosquitto` 1.0.0. The listener port, service port (the host port) and anonymous access apply to it. The new settings user name and password (compose only) create a password file with one user in memory; a compose package carries no Secret.

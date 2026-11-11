@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.3.0-openshift.1
+
+- The chart is now grafana-restricted 0.1.0-openshift.1, a wrapper around the unchanged grafana-community grafana chart 13.7.0 (`helm-grafana/chart`). It removes the chart's fixed `runAsUser`, `runAsGroup` and `fsGroup` (472), which OpenShift's restricted SCC rejects. OpenShift assigns these IDs from the namespace's UID range. Every Helm parameter pointer now starts with `grafana.`.
+
+- OpenShift only: this branch of the catalog targets OpenShift. Use the `main` catalog on other Kubernetes distributions.
+
 ## 1.2.0
 
 - Chart: grafana 13.2.7 → 13.7.0 (unchanged mirror).

@@ -21,18 +21,20 @@ spec:
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
+      # No runAsUser, runAsGroup or fsGroup: OpenShift's restricted SCC
+      # assigns them from the namespace's UID range and rejects fixed IDs.
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1883
-        runAsGroup: 1883
-        fsGroup: 1883
         seccompProfile:
           type: RuntimeDefault
+        {{- with .Values.podSecurityContext }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- if .Values.auth.existingSecret }}
       # mosquitto 2.1 cannot open a Secret volume's symlinked key and warns
       # that it will refuse a password file it does not own. The init
-      # container (non-root, same image) copies the file into an emptyDir as
-      # UID 1883 with mode 0600. A changed Secret takes effect on the next
+      # container (non-root, same image, same UID as the broker) copies the
+      # file into an emptyDir with mode 0600. A changed Secret takes effect on the next
       # pod start.
       initContainers:
         - name: password-file

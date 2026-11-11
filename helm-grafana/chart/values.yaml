@@ -1,0 +1,15 @@
+# Values of the wrapper chart grafana-restricted. Everything below is passed
+# to the unchanged upstream subchart grafana-community/grafana 13.7.0.
+#
+# The upstream chart fixes the pod's runAsUser, runAsGroup and fsGroup to
+# 472. OpenShift's restricted SCC assigns these IDs from the namespace's UID
+# range and rejects fixed IDs. `null` removes the upstream defaults. A Margo
+# parameter cannot do this: the agent sets every parameter as a string.
+# runAsNonRoot stays true; the image's own user is 472 and OpenShift runs the
+# pod as a non-root UID of the namespace's range.
+grafana:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: null
+    runAsGroup: null
+    fsGroup: null

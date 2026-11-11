@@ -1,0 +1,20 @@
+# Values of the wrapper chart node-red-restricted. Everything below is passed
+# to the unchanged upstream subchart schwarzit/node-red 0.40.2.
+#
+# The upstream chart fixes runAsUser, runAsGroup and fsGroup to 1000.
+# OpenShift's restricted SCC assigns these IDs from the namespace's UID range
+# and rejects fixed IDs. `null` removes the upstream defaults. A Margo
+# parameter cannot do this: the agent sets every parameter as a string. The
+# rest of the upstream security context (runAsNonRoot, seccomp
+# RuntimeDefault, no privilege escalation, all capabilities dropped) stays.
+# Each map also keeps one non-null key: Helm drops a parent map that holds
+# only nulls, and the upstream defaults then remain.
+node-red:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: null
+    fsGroup: null
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: null
+    runAsGroup: null

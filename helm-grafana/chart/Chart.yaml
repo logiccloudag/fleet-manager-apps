@@ -1,0 +1,23 @@
+apiVersion: v2
+name: grafana-restricted
+description: >-
+  Grafana for the kubernetes-agent on OpenShift. A thin wrapper around the
+  unchanged upstream grafana-community grafana chart that removes the chart's
+  fixed runAsUser, runAsGroup and fsGroup (472). OpenShift's restricted SCC
+  assigns them from the namespace's UID range and rejects fixed IDs. Margo
+  parameters reach the agent as strings only, so these values cannot be
+  removed through parameters.
+type: application
+version: 0.1.0-openshift.1
+appVersion: "13.2.4"
+kubeVersion: ^1.25.0-0
+home: https://github.com/logiccloudag/fleet-manager-apps
+sources:
+  - https://github.com/grafana-community/helm-charts/tree/main/charts/grafana
+  - https://github.com/grafana/grafana
+annotations:
+  artifacthub.io/license: Apache-2.0
+dependencies:
+  - name: grafana
+    version: 13.7.0
+    repository: oci://ghcr.io/grafana-community/helm-charts

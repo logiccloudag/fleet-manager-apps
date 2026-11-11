@@ -1,0 +1,7 @@
+# Used only by the cluster stage of scripts/check.sh on a cluster without
+# OpenShift's UID assignment (kind in CI). It sets the IDs that OpenShift's
+# restricted SCC would assign. Never part of a deployment.
+influxdb2:
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000

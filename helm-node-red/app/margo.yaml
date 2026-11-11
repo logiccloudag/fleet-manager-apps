@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: node-red
 metadata:
   name: Node-RED
-  version: "1.1.0"
+  version: "1.2.0-openshift.1"
   description: >-
     Node-RED 4 low-code flow editor for wiring devices, APIs and services,
     installed from the upstream schwarzit Helm chart. Runs under Pod Security
@@ -29,8 +29,10 @@ deploymentProfiles:
       - name: node-red
         properties:
           # Unchanged mirror of oci://ghcr.io/schwarzit/charts/node-red.
-          repository: oci://ghcr.io/logiccloudag/margo-charts/node-red
-          revision: "0.40.2"
+          # Wrapper around the unchanged schwarzit node-red chart 0.40.2
+          # without fixed UID, GID and fsGroup (OpenShift; helm-node-red/chart).
+          repository: oci://ghcr.io/logiccloudag/margo-charts/node-red-restricted
+          revision: "0.1.0-openshift.1"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -66,8 +68,9 @@ deploymentProfiles:
 # be switched off with the empty string "". The parameters marked "Fixed" keep
 # the chart inside the agent's namespace-scoped Role. They are not listed in
 # `configuration`: do not override them. The chart's own defaults already
-# pass Pod Security "restricted" (non-root UID 1000, seccomp RuntimeDefault,
-# no privilege escalation, all capabilities dropped).
+# pass Pod Security "restricted" (non-root, seccomp RuntimeDefault, no
+# privilege escalation, all capabilities dropped). The wrapper chart removes
+# the fixed UID 1000, GID 1000 and fsGroup 1000: OpenShift assigns them.
 # A target of a *-compose component names an environment variable of
 # compose/compose.yaml instead (Margo Target.pointer for compose); its
 # default there equals the value here. Parameters without such a target
@@ -80,58 +83,58 @@ parameters:
   imageRegistry:
     value: "ghcr.io"
     targets:
-      - pointer: image.registry
+      - pointer: node-red.image.registry
         components: [node-red]
   imageRepository:
     value: "logiccloudag/margo-images/node-red"
     targets:
-      - pointer: image.repository
+      - pointer: node-red.image.repository
         components: [node-red]
   imageTag:
     value: "4.1.2@sha256:216e7403aab9888f7e68de9e468fed31bb9d7b2d38117c08e645095a63658a2f"
     targets:
-      - pointer: image.tag
+      - pointer: node-red.image.tag
         components: [node-red]
   # Fixed: the agent's Role cannot create Role or RoleBinding objects. The
   # chart's Role serves only the (disabled) flow-refresh sidecar.
   rbacEnabled:
     value: ""
     targets:
-      - pointer: rbac.enabled
+      - pointer: node-red.rbac.enabled
         components: [node-red]
   # Fixed: keep flows, credentials and installed nodes on a PVC of the
   # cluster default StorageClass. "false" would NOT disable it.
   persistenceEnabled:
     value: "true"
     targets:
-      - pointer: persistence.enabled
+      - pointer: node-red.persistence.enabled
         components: [node-red]
   persistenceSize:
     value: "5Gi"
     targets:
-      - pointer: persistence.size
+      - pointer: node-red.persistence.size
         components: [node-red]
   servicePort:
     value: "1880"
     targets:
-      - pointer: service.port
+      - pointer: node-red.service.port
         components: [node-red]
       - pointer: NODE_RED_PORT
         components: [node-red-compose]
   cpuRequest:
     value: "100m"
     targets:
-      - pointer: resources.requests.cpu
+      - pointer: node-red.resources.requests.cpu
         components: [node-red]
   memoryRequest:
     value: "128Mi"
     targets:
-      - pointer: resources.requests.memory
+      - pointer: node-red.resources.requests.memory
         components: [node-red]
   memoryLimit:
     value: "512Mi"
     targets:
-      - pointer: resources.limits.memory
+      - pointer: node-red.resources.limits.memory
         components: [node-red]
 configuration:
   sections:

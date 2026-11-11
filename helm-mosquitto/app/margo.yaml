@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: mosquitto
 metadata:
   name: Eclipse Mosquitto
-  version: "2.1.0"
+  version: "2.2.0-openshift.1"
   description: >-
     Eclipse Mosquitto 2.1 MQTT broker (MQTT 3.1, 3.1.1 and 5.0) from the
     official eclipse-mosquitto image, installed from mosquitto-restricted, a
@@ -32,7 +32,7 @@ deploymentProfiles:
         properties:
           # The chart in helm-mosquitto/chart.
           repository: oci://ghcr.io/logiccloudag/margo-charts/mosquitto-restricted
-          revision: "0.2.0"
+          revision: "0.3.0-openshift.1"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -65,7 +65,7 @@ deploymentProfiles:
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. The chart reads every
 # value string-safely: "false" switches a boolean off, numbers may be strings.
-# The Pod Security settings (UID 1883, seccomp RuntimeDefault, no privilege
+# The Pod Security settings (non-root UID assigned by OpenShift, seccomp RuntimeDefault, no privilege
 # escalation, all capabilities dropped, read-only root file system) are fixed
 # in the chart and are not parameters.
 # A target of a *-compose component names an environment variable of

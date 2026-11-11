@@ -38,3 +38,9 @@ resources:
     memory: 64Mi
   limits:
     memory: 128Mi
+
+# Extra keys of the pod's securityContext, for example runAsUser, runAsGroup
+# and fsGroup on a cluster without OpenShift's UID assignment. Empty on
+# OpenShift: its restricted SCC rejects fixed IDs. Typed values only, so a
+# Margo parameter cannot set them (scripts/check.sh uses ci/cluster-values.yaml).
+podSecurityContext: {}

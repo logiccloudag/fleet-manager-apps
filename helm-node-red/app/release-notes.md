@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.0-openshift.1
+
+- The chart is now node-red-restricted 0.1.0-openshift.1, a wrapper around the unchanged schwarzit node-red chart 0.40.2 (`helm-node-red/chart`). It removes the chart's fixed `runAsUser`, `runAsGroup` and `fsGroup` (1000), which OpenShift's restricted SCC rejects. OpenShift assigns these IDs from the namespace's UID range. Every Helm parameter pointer now starts with `node-red.`.
+
+- OpenShift only: the images of InfluxDB, Mosquitto, Node-RED and Traefik do not declare a numeric non-root user, so without OpenShift's UID assignment the pod fails `runAsNonRoot` on other Kubernetes distributions. Use the `main` catalog there.
+
 ## 1.1.0
 
 - New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/node-red` 1.0.0. The service port (the host port) applies to it. The editor has no login: publish the port only on a trusted network.

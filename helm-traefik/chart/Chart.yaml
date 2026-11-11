@@ -8,7 +8,7 @@ description: >-
   IngressClass. Every value is read string-safely, because the agent sets
   Margo parameters as strings.
 type: application
-version: 0.2.1
+version: 0.3.0-openshift.1
 appVersion: "v3.7.16"
 kubeVersion: ">=1.21.0-0"
 home: https://github.com/logiccloudag/fleet-manager-apps

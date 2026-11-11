@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.1.0"
+  version: "1.2.0-openshift.1"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
@@ -32,7 +32,7 @@ deploymentProfiles:
           # The wrapper chart in helm-influxdb/chart (it vendors the
           # unchanged influxdata/influxdb2 2.1.2 chart as a dependency).
           repository: oci://ghcr.io/logiccloudag/margo-charts/influxdb2-restricted
-          revision: "0.2.0"
+          revision: "0.3.0-openshift.1"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -64,7 +64,7 @@ deploymentProfiles:
       storage: 8Gi
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. The typed Pod Security
-# settings (non-root UID 1000, seccomp RuntimeDefault, no privilege
+# settings (non-root UID assigned by OpenShift, seccomp RuntimeDefault, no privilege
 # escalation, all capabilities dropped) and the disabled PodDisruptionBudget
 # are values of the wrapper chart, because a string cannot express them.
 # The pointers start with "influxdb2." because the upstream chart is a

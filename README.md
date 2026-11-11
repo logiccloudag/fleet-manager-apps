@@ -16,6 +16,28 @@ description.
 Every package and image is public on ghcr.io and published from `main` by
 GitHub Actions (see "Publishing"). The design is ADR FM-A-202.
 
+## OpenShift branch (`rc2`)
+
+This branch is for OpenShift only. OpenShift's restricted SCC assigns each
+pod a UID, a GID and an fsGroup from the namespace's range, and rejects a pod
+that sets fixed IDs. No chart on this branch sets `runAsUser`, `runAsGroup`
+or `fsGroup`; `runAsNonRoot`, seccomp `RuntimeDefault`, no privilege
+escalation and dropped capabilities stay.
+
+- Mosquitto, Traefik and InfluxDB: the IDs are removed from the chart.
+- Grafana and Node-RED: their upstream charts fix the IDs, and a Margo
+  parameter cannot remove a typed value. Each is therefore a wrapper chart
+  (`helm-<app>/chart`) that sets the IDs to `null` and passes everything else
+  to the unchanged upstream chart. Their Helm parameter pointers start with
+  `grafana.` and `node-red.`. Helm 4 drops these `null` values when no
+  `--set` value is given; the agent always passes parameters, so this does
+  not occur in a deployment.
+- Chart and app versions carry the prerelease suffix `-openshift.<n>`, so
+  they never collide with versions published from `main`.
+- On other Kubernetes distributions the InfluxDB, Mosquitto, Node-RED and
+  Traefik pods fail `runAsNonRoot`: their images do not declare a numeric
+  non-root user. Use the `main` catalog there.
+
 ## Layout
 
 ```text
@@ -61,11 +83,11 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 
 | App (`id`) | Chart in `margo-charts` | Upstream chart | Chart license | Application and image | Type |
 | --- | --- | --- | --- | --- | --- |
-| `grafana` | `grafana` 13.7.0 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | mirror |
-| `influxdb` | `influxdb2-restricted` 0.2.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
-| `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
-| `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
-| `traefik` | `traefik-restricted` 0.2.1 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
+| `grafana` | `grafana-restricted` 0.1.0-openshift.1 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 (a dependency) | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | wrapper |
+| `influxdb` | `influxdb2-restricted` 0.3.0-openshift.1 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
+| `mosquitto` | `mosquitto-restricted` 0.3.0-openshift.1 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
+| `node-red` | `node-red-restricted` 0.1.0-openshift.1 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 (a dependency) | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | wrapper |
+| `traefik` | `traefik-restricted` 0.3.0-openshift.1 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
 
 The compose package of `grafana`, `influxdb`, `mosquitto` and `node-red` is
 version 1.0.0. Traefik has no compose profile: it is a Kubernetes ingress
@@ -98,7 +120,7 @@ Every image is an official upstream image. No Bitnami chart or image is used.
   `mosquitto-restricted` chart in `helm-mosquitto/chart` therefore runs the
   official image itself:
   - it renders a ConfigMap, a Service, an optional PVC and a Deployment;
-  - it has fixed Pod Security `restricted` settings (UID 1883, read-only root
+  - it has fixed Pod Security `restricted` settings (no fixed UID, read-only root
     file system);
   - it works on Kubernetes 1.21 and later (`kubeVersion: ">=1.21.0-0"`);
   - anonymous access is off by default;
@@ -132,7 +154,7 @@ Every image is an official upstream image. No Bitnami chart or image is used.
     `extensions`): a Role can never grant more than the agent has;
   - HTTP only, Service type NodePort by default (`serviceType`,
     `webNodePort`);
-  - fixed Pod Security `restricted` settings (UID 65532, read-only root file
+  - fixed Pod Security `restricted` settings (no fixed UID, read-only root file
     system).
 
   It needs a kubernetes-agent installed with the opt-in

@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.0-openshift.1
+
+- Chart: influxdb2-restricted 0.3.0-openshift.1. The fixed `runAsUser` and `runAsGroup` (1000), and so the derived `fsGroup`, are removed, because OpenShift's restricted SCC rejects them. OpenShift assigns these IDs from the namespace's UID range.
+
+- OpenShift only: the images of InfluxDB, Mosquitto, Node-RED and Traefik do not declare a numeric non-root user, so without OpenShift's UID assignment the pod fails `runAsNonRoot` on other Kubernetes distributions. Use the `main` catalog there.
+
 ## 1.1.0
 
 - New compose deployment profile (`compose`), package `oci://ghcr.io/logiccloudag/margo-compose/influxdb` 1.0.0. The initial setup settings and the service port (the host port) apply to it. An empty administrator password is generated at the first start and stored in `/etc/influxdb2/generated-admin-password` in the container.

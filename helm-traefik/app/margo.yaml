@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: traefik
 metadata:
   name: Traefik
-  version: "1.1.1"
+  version: "1.2.0-openshift.1"
   description: >-
     Traefik 3.7 ingress controller from the official traefik image, installed
     from traefik-restricted, a small logiccloud chart. It serves the
@@ -34,7 +34,7 @@ deploymentProfiles:
         properties:
           # The chart in helm-traefik/chart.
           repository: oci://ghcr.io/logiccloudag/margo-charts/traefik-restricted
-          revision: "0.2.1"
+          revision: "0.3.0-openshift.1"
           wait: true
           timeout: "5m0s"
     requiredResources:
@@ -48,7 +48,7 @@ deploymentProfiles:
 # Every parameter reaches the kubernetes-agent as a string and is set like
 # `helm --set-string` at the dot path in `pointer`. The chart reads every
 # value string-safely: numbers may be strings.
-# The Pod Security settings (UID 65532, seccomp RuntimeDefault, no privilege
+# The Pod Security settings (non-root UID assigned by OpenShift, seccomp RuntimeDefault, no privilege
 # escalation, all capabilities dropped, read-only root file system) and the
 # namespaced Role (Ingresses, Services, EndpointSlices, Secrets of the
 # agent's namespace) are fixed in the chart and are not parameters.

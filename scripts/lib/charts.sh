@@ -104,7 +104,10 @@ fetch_upstream() {
       # user's own Helm repositories are neither used nor changed.
       local repo n=0
       export HELM_REPOSITORY_CONFIG="$tmp/repositories.yaml" HELM_REPOSITORY_CACHE="$tmp/repository-cache"
+      # An oci:// dependency needs no repository definition; with no https
+      # dependency the here-document holds one empty line.
       while read -r repo; do
+        [ -n "$repo" ] || continue
         n=$((n + 1))
         helm repo add "dep$n" "$repo" >/dev/null || die "$chart: helm repo add $repo failed"
       done <<REPOS

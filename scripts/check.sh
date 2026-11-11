@@ -316,6 +316,15 @@ YAML
 
 check_cluster() {
   local rel="$COMPONENT-check" rc=0 notready failed_events
+  # The charts set no UID, GID or fsGroup: OpenShift's restricted SCC assigns
+  # them. A plain cluster (kind) does not, and an image without a numeric
+  # non-root USER then fails runAsNonRoot. helm-<app>/ci/cluster-values.yaml
+  # sets the IDs that OpenShift would assign, for this stage only.
+  local cluster_values=()
+  if [ -f "$REPO_ROOT/$CHECK_APP/ci/cluster-values.yaml" ]; then
+    cluster_values=(-f "$REPO_ROOT/$CHECK_APP/ci/cluster-values.yaml")
+    log "$CHECK_APP: cluster stage adds ci/cluster-values.yaml (emulates OpenShift's UID assignment)"
+  fi
   # 1. kubectl server-side dry run of the rendered objects: PSA warnings
   #    for workload objects arrive as "Warning:" lines. RoleBindings are
   #    left out: a dry run persists nothing, so the API server's bind check
@@ -339,7 +348,7 @@ PY
     echo "  PASS  kubectl apply --dry-run=server: no warning, no violation"
   fi
   # 2. helm install --dry-run=server (renders against the live cluster).
-  helm install "$rel" "$TGZ" -n "$CHECK_NAMESPACE" -f "$VALUES" --kube-as-user "$AS_USER" \
+  helm install "$rel" "$TGZ" -n "$CHECK_NAMESPACE" -f "$VALUES" ${cluster_values[@]+"${cluster_values[@]}"} --kube-as-user "$AS_USER" \
     --dry-run=server >/dev/null 2>"$WORK/hdry.log" || rc=$?
   sed 's/^/  helm| /' "$WORK/hdry.log"
   if [ "$rc" != 0 ] || grep -qiE 'podsecurity|violate|forbidden' "$WORK/hdry.log"; then
@@ -348,7 +357,7 @@ PY
   fi
   echo "  PASS  helm install --dry-run=server"
   # 3. Real install, every pod Ready, no FailedCreate, uninstall.
-  if ! helm install "$rel" "$TGZ" -n "$CHECK_NAMESPACE" -f "$VALUES" --kube-as-user "$AS_USER" \
+  if ! helm install "$rel" "$TGZ" -n "$CHECK_NAMESPACE" -f "$VALUES" ${cluster_values[@]+"${cluster_values[@]}"} --kube-as-user "$AS_USER" \
     --wait --timeout "$WAIT_TIMEOUT" >/dev/null 2>"$WORK/install.log"; then
     sed 's/^/  helm| /' "$WORK/install.log"
     kubectl get pods,events -n "$CHECK_NAMESPACE" 2>&1 | sed 's/^/  kubectl| /'
@@ -399,6 +408,7 @@ while IFS="$(printf '\t')" read -r app chart version type source sha; do
   TGZ=""
   COMPONENT=""
   VALUES=""
+  CHECK_APP="$app"
   stage "$app" "bart validate" check_bart "$app"
   stage "$app" "fleet-manager rules" check_fleet_manager "$app" "$chart" "$version"
   stage "$app" "chart $chart $version ($CHART_SOURCE)" fetch_chart "$chart" "$version" "$type" "$source" "$sha"

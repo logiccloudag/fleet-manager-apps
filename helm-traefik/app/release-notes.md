@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.0-openshift.1
+
+- Chart: traefik-restricted 0.3.0-openshift.1. The fixed `runAsUser` and `runAsGroup` (65532) are removed, because OpenShift's restricted SCC rejects them. OpenShift assigns these IDs from the namespace's UID range.
+
+- OpenShift only: the images of InfluxDB, Mosquitto, Node-RED and Traefik do not declare a numeric non-root user, so without OpenShift's UID assignment the pod fails `runAsNonRoot` on other Kubernetes distributions. Use the `main` catalog there.
+
 ## 1.1.1
 
 - Image: `ghcr.io/logiccloudag/margo-images/traefik:v3.7.16`, a copy of `docker.io/library/traefik:v3.7.16` (v3.7.14 before).

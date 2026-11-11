@@ -1,0 +1,6 @@
+dependencies:
+- name: node-red
+  repository: oci://ghcr.io/schwarzit/charts
+  version: 0.40.2
+digest: sha256:30603c78d95e7352aee86b2314e7d551bb9bb3408d172a2850c64532520d1e91
+generated: "2026-11-11T15:43:50.825771+02:00"
