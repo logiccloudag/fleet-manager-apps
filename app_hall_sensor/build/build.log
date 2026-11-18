@@ -1,0 +1,42 @@
+{
+  "t": 1794405012.045648,
+  "build": "114fa3a97f0d",
+  "app": "edu-kit-irs-hall-sensor-gpio3",
+  "container": "hall-sensor-gpio3",
+  "version": "1.0.1",
+  "ok": true,
+  "ms": 1333,
+  "failStep": -1,
+  "tasks": [
+    {
+      "task": "compile",
+      "state": "ok",
+      "detail": "clang++.exe --target=wasm32-wasi -O2 -z stack-size=8192 -Wl,--strip-all -Wl,--allow-undefined -Wl,--export=__heap_base -Wl,--export=__data_end -fno-exceptions -fno-rtti -nostartfiles -Wl,--no-entry -Wl,--export=_start -o hall-sensor-gpio3.wasm hall_effect_sensor.cpp  (1.6 KB)"
+    },
+    {
+      "task": "validate-app",
+      "state": "ok",
+      "detail": "Margo application-description schema"
+    },
+    {
+      "task": "validate-compose",
+      "state": "ok",
+      "detail": ""
+    },
+    {
+      "task": "push-image",
+      "state": "ok",
+      "detail": "artifactType application/wasm"
+    },
+    {
+      "task": "push-component",
+      "state": "ok",
+      "detail": "application/vnd.org.margo.component.compose.tar+gzip"
+    },
+    {
+      "task": "push-app",
+      "state": "ok",
+      "detail": "artifactType application/vnd.margo.app.v1+json \u00b7 tag 1.0.1"
+    }
+  ]
+}

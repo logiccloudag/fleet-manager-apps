@@ -1,0 +1,71 @@
+{
+  "container": "hall-sensor-gpio3",
+  "codeName": "hall_effect_sensor.cpp",
+  "app": {
+    "id": "",
+    "name": "",
+    "version": "1.0.1",
+    "tagline": "",
+    "description": "",
+    "tags": "",
+    "site": "",
+    "icon": "",
+    "descriptionFile": "",
+    "releaseNotes": "",
+    "licenseFile": "",
+    "ptype": "custom",
+    "pid": "",
+    "pdesc": "",
+    "cores": "",
+    "memory": "",
+    "storage": ""
+  },
+  "arch": [],
+  "orgs": [
+    {
+      "name": "",
+      "site": ""
+    }
+  ],
+  "authors": [
+    {
+      "name": "",
+      "email": ""
+    }
+  ],
+  "comps": [
+    {
+      "name": "",
+      "repository": "",
+      "revision": "",
+      "timeout": ""
+    }
+  ],
+  "params": [
+    {
+      "ui": false,
+      "key": "",
+      "type": "string",
+      "value": "10",
+      "pointer": "",
+      "component": "hall-sensor-gpio3",
+      "sec": "",
+      "label": "",
+      "desc": "",
+      "min": "",
+      "max": "",
+      "immutable": false,
+      "allowEmpty": false
+    }
+  ],
+  "services": [
+    {
+      "custom": [],
+      "name": "",
+      "image": "",
+      "platform": "wasi/wasm",
+      "restart": "always"
+    }
+  ],
+  "friendly": ""
+}

@@ -1,0 +1,7 @@
+services:
+  hall-sensor-gpio3:
+    image: localhost:5000/images/hall-sensor-gpio3:1.0.1
+    platform: wasi/wasm
+    restart: always
+    environment:
+      PERIOD_MS: ${PERIOD_MS:-10}   # margo parameter periodMs

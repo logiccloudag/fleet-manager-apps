@@ -1,0 +1,29 @@
+apiVersion: v1
+id: edu-kit-irs-hall-sensor-gpio3
+metadata:
+  name: Hall Sensor Gpio3
+  version: 1.0.1
+  catalog:
+    organization:
+      - name: KIT IRS
+deploymentProfiles:
+  - type: custom
+    id: edu-kit-irs-hall-sensor-gpio3-wasm
+    components:
+      - name: hall-sensor-gpio3
+        properties:
+          repository: oci://localhost:5000/images/hall-sensor-gpio3
+          revision: 1.0.1
+    deviceConstraints:
+      eligibilityRules:
+        - labelSelector:
+            matchExpressions:
+              - key: edu.kit.irs/runtime
+                operator: In
+                values: [ocre-wasm]
+parameters:
+  periodMs:
+    value: "10"
+    targets:
+      - pointer: PERIOD_MS
+        components: ["hall-sensor-gpio3"]
