@@ -33,8 +33,15 @@ escalation and dropped capabilities stay.
   `grafana.` and `node-red.`. Helm 4 drops these `null` values when no
   `--set` value is given; the agent always passes parameters, so this does
   not occur in a deployment.
-- Chart and app versions carry the prerelease suffix `-openshift.<n>`, so
-  they never collide with versions published from `main`.
+- Versions have no suffix. App versions only need to be unique on this
+  branch. Chart versions share the registry `ghcr.io/logiccloudag/margo-charts`
+  with `main`, so a chart version belongs to one branch: this branch uses the
+  versions in `scripts/charts.tsv`, and `main` skips them (for example `main`
+  goes from `influxdb2-restricted` 0.2.0 to 0.4.0, because 0.3.0 is this
+  branch's). The publish scripts never overwrite a published tag, so a
+  collision fails the publish instead of replacing the other branch's chart.
+  Compose packages have no OpenShift-specific content, so both branches
+  publish the same package under the same version.
 - On other Kubernetes distributions the InfluxDB, Mosquitto, Node-RED and
   Traefik pods fail `runAsNonRoot`: their images do not declare a numeric
   non-root user. Use the `main` catalog there.
@@ -86,15 +93,16 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 
 | App (`id`) | Chart in `margo-charts` | Upstream chart | Chart license | Application and image | Type |
 | --- | --- | --- | --- | --- | --- |
-| `grafana` | `grafana-restricted` 0.1.0-openshift.1 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 (a dependency) | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | wrapper |
-| `influxdb` | `influxdb2-restricted` 0.3.0-openshift.1 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
-| `mosquitto` | `mosquitto-restricted` 0.3.0-openshift.1 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
-| `node-red` | `node-red-restricted` 0.1.0-openshift.1 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 (a dependency) | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | wrapper |
-| `traefik` | `traefik-restricted` 0.3.0-openshift.1 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
-| `telegraf` | `telegraf-restricted` 0.1.0-openshift.1 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
+| `grafana` | `grafana-restricted` 0.1.0 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 (a dependency) | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | wrapper |
+| `influxdb` | `influxdb2-restricted` 0.3.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
+| `mosquitto` | `mosquitto-restricted` 0.3.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
+| `node-red` | `node-red-restricted` 0.1.0 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 (a dependency) | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | wrapper |
+| `traefik` | `traefik-restricted` 0.3.0 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
+| `telegraf` | `telegraf-restricted` 0.3.0 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
 
-The compose package of `grafana`, `influxdb`, `mosquitto`, `node-red` and
-`telegraf` is version 1.0.0. Traefik has no compose profile: it is a Kubernetes ingress
+`grafana`, `influxdb`, `mosquitto`, `node-red` and `telegraf` also have a
+compose package; its version is the `revision` of the compose component in
+`app/margo.yaml`. Traefik has no compose profile: it is a Kubernetes ingress
 controller.
 
 A mirror chart cannot be changed, so its image is set by fixed parameters
@@ -173,9 +181,13 @@ must check both.
   - it has fixed Pod Security `restricted` settings (non-root, no fixed UID
     or GID, read-only root file system) and starts `telegraf` directly,
     without the image's root-dropping entrypoint;
-  - it collects Telegraf's own and the host's CPU, memory and system
-    metrics, and serves them for Prometheus on port 9273 (`/metrics`, also
-    the probes);
+  - it collects Telegraf's own metrics and the node's CPU, memory, kernel
+    and disk I/O figures (the kernel does not separate them per container),
+    the pod's file system, process and network metrics, and optionally the
+    temperature sensors. It serves them for Prometheus on port 9273
+    (`/metrics`, also the probes). The node's file systems, processes and
+    network would need `hostPath`, `hostPID` or `hostNetwork`, which Pod
+    Security `restricted` forbids;
   - the MQTT input (`mqttServers`) and the InfluxDB 2 output
     (`influxdbUrl`) are off while empty. Their credentials come from an
     existing Secret (`mqttExistingSecret` with the keys `username` and
@@ -250,6 +262,12 @@ Rules of this catalog for `compose.yaml` (`scripts/check.sh` enforces them):
   pinned in `scripts/images.tsv`;
 - no bind mounts, no secrets, no `build`, no host network, PID or IPC, no
   devices, no top-level `name` (the device names the project);
+- one exception, host access as an opt-in: `network_mode` or the source of
+  a read-only (`:ro`) volume may be exactly `${VAR:-default}`, where `VAR`
+  is the compose target of a Margo parameter and the default (the
+  parameter value) gives no host access (not `host`; a named volume of
+  `compose.yaml`). Host access then exists only when whoever deploys the
+  app sets that parameter. Telegraf uses it (`networkMode`, `hostRoot`);
 - `cap_drop: [ALL]` and `no-new-privileges:true` on every service, no
   `cap_add`; each service runs as the image's non-root user.
 
@@ -286,7 +304,18 @@ Per app:
   carries no Secret, so the compose-only settings user name, password and
   API token are plain parameters; `telegraf.conf` references them as
   environment variables and does not contain them. A health check on
-  `/metrics` gates `docker compose up --wait`.
+  `/metrics` gates `docker compose up --wait`. Host access is off by
+  default. `networkMode` `host` gives the host's network (interfaces, host
+  name, `127.0.0.1` reaches the InfluxDB app on the same device; the port
+  mapping then has no effect). `hostRoot` `/` mounts the host's root file
+  system read-only at `/hostfs`, and Telegraf reads the host's file
+  systems and processes there (`HOST_PROC` and the other `HOST_*`
+  variables). A select schema allows only these values. To write to the
+  InfluxDB compose app on the same device: `networkMode` `host`,
+  `influxdbUrl` `http://127.0.0.1:8086`, and an API token with write
+  access to the bucket in `influxdbToken`. Limit the bucket's retention
+  with the InfluxDB app's retention setting (for example `30d`) on a device
+  that boots from an SD card.
 
 ## kubernetes-agent constraints
 

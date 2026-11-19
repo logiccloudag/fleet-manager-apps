@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.3.3
+
+- Versions no longer carry the `-openshift.<n>` suffix: the app is 1.3.3 and the chart grafana-restricted 0.1.0. The chart is unchanged apart from its version.
+
 ## 1.3.2-openshift.1
 
 - Compose package 1.1.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/grafana:13.2.4-distroless`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.
