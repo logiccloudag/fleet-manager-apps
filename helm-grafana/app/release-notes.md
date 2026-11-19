@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.4.0
+
+- New setting `publicDashboards` (section Sharing): `[public_dashboards] enabled` in `grafana.ini`, set through Grafana's environment override `GF_PUBLIC_DASHBOARDS_ENABLED`. `true` (the default, as in Grafana) allows sharing a dashboard through a public link without login; `false` switches public dashboards off, and existing public links stop working.
+- Compose package 1.2.0. The chart is unchanged.
+
 ## 1.3.2
 
 - Compose package 1.1.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/grafana:13.2.4-distroless`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.
