@@ -3,7 +3,7 @@
 A catalog of Margo applications for fleet-manager. Each app is a Margo
 Margo rc3 `ApplicationDescription` (`apiVersion: v1`) with a Helm profile, which devices running the
 [kubernetes-agent](https://logiccloud.youtrack.cloud/projects/KA) install.
-Grafana, InfluxDB, Mosquitto and Node-RED also have a compose profile for
+Grafana, InfluxDB, Mosquitto, Node-RED and Telegraf also have a compose profile for
 devices that run Docker Compose (see "Compose profile").
 
 fleet-manager reads this repository as a **Git registry**: in the UI open
@@ -25,9 +25,11 @@ helm-<app>/
   app/margo.yaml          the ApplicationDescription (bart layout)
   app/icon.png            catalog icon (256 px)
   app/release-notes.md    catalog release notes
-  compose/compose.yaml    the compose package (four apps; bart layout)
+  app/license.txt         the upstream license of the application
+  compose/compose.yaml    the compose package (five apps; bart layout)
 helm-influxdb/chart/      the influxdb2-restricted wrapper chart (see below)
 helm-mosquitto/chart/     the mosquitto-restricted chart (see below)
+helm-telegraf/chart/      the telegraf-restricted chart (see below)
 helm-traefik/chart/       the traefik-restricted chart (see below)
 scripts/charts.tsv        pinned chart per app: name, version, source, sha256
 scripts/images.tsv        pinned image: name, upstream, tag, digest, apps
@@ -68,9 +70,10 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
 | `traefik` | `traefik-restricted` 0.2.3 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.19, copy of `docker.io/library/traefik:v3.7.19` (MIT) | local |
+| `telegraf` | `telegraf-restricted` 0.1.0 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
 
-The compose package of `grafana`, `influxdb`, `mosquitto` and `node-red` is
-version 1.0.0. Traefik has no compose profile: it is a Kubernetes ingress
+The compose package of `grafana`, `influxdb`, `mosquitto`, `node-red` and
+`telegraf` is version 1.0.0. Traefik has no compose profile: it is a Kubernetes ingress
 controller.
 
 A mirror chart cannot be changed, so its image is set by fixed parameters
@@ -86,6 +89,25 @@ wrapper and local charts set it in their `values.yaml`.
   dependency.
 
 Every image is an official upstream image. No Bitnami chart or image is used.
+
+### Vendor and license
+
+These are third-party applications: logiccloud only packages them. The
+catalog therefore names the vendor of each application in
+`metadata.catalog.organization`, never logiccloud, and
+`metadata.catalog.application.licenseFile` points to `app/license.txt`, the
+license text of the application at the pinned upstream version.
+`scripts/check.sh` requires the license file. A new app and a major upgrade
+must check both.
+
+| App | Vendor (`organization`) | License of the application (`license.txt`) |
+| --- | --- | --- |
+| `grafana` | Grafana Labs, https://grafana.com | AGPL-3.0 |
+| `influxdb` | InfluxData, https://www.influxdata.com | MIT |
+| `mosquitto` | Eclipse Foundation, https://www.eclipse.org | EPL-2.0 or EDL-1.0 (BSD-3-Clause) |
+| `node-red` | OpenJS Foundation, https://openjsf.org | Apache-2.0 |
+| `traefik` | Traefik Labs, https://traefik.io | MIT |
+| `telegraf` | InfluxData, https://www.influxdata.com | MIT |
 
 ### Why these charts
 
@@ -118,6 +140,28 @@ Every image is an official upstream image. No Bitnami chart or image is used.
     -c 'mosquitto_passwd -c -b /tmp/passwd <user> <password> >/dev/null 2>&1; cat /tmp/passwd' >passwd
   kubectl -n <agent-namespace> create secret generic mosquitto-users --from-file=passwd=passwd
   ```
+
+- **Telegraf.** The upstream chart (`telegraf` 1.8.78 from
+  `https://helm.influxdata.com`) renders a PodDisruptionBudget, which the
+  agent's Role cannot create, and has no container security context: it
+  cannot set `allowPrivilegeEscalation: false` or drop capabilities, and
+  its image starts as root. A pod-level security context is a typed value
+  that a string parameter cannot set either. The `telegraf-restricted` chart in
+  `helm-telegraf/chart` therefore runs the official image itself:
+  - it renders a ConfigMap, a Service and a Deployment;
+  - it has fixed Pod Security `restricted` settings (UID 10001, read-only
+    root file system) and starts `telegraf` directly, without the image's
+    root-dropping entrypoint;
+  - it collects Telegraf's own and the host's CPU, memory and system
+    metrics, and serves them for Prometheus on port 9273 (`/metrics`, also
+    the probes);
+  - the MQTT input (`mqttServers`) and the InfluxDB 2 output
+    (`influxdbUrl`) are off while empty. Their credentials come from an
+    existing Secret (`mqttExistingSecret` with the keys `username` and
+    `password`, `influxdbExistingSecret` with the key `token`), which
+    Telegraf reads from the environment;
+  - a value that would go into `telegraf.conf` with a double quote or a
+    backslash is refused, so a parameter cannot inject configuration.
 
 - **Traefik.** The upstream chart (`oci://ghcr.io/traefik/helm/traefik`)
   ships 25 CRDs in `crds/`. Helm installs them whatever the values say, and
@@ -216,6 +260,12 @@ Per app:
   create a password file with one user in memory.
 - **Node-RED.** The image's health check gates `docker compose up --wait`.
   The editor has no login: publish its port only on a trusted network.
+- **Telegraf.** Runs as UID 10001 with a read-only root file system. The
+  configuration is written at start from the variables. A compose package
+  carries no Secret, so the compose-only settings user name, password and
+  API token are plain parameters; `telegraf.conf` references them as
+  environment variables and does not contain them. A health check on
+  `/metrics` gates `docker compose up --wait`.
 
 ## kubernetes-agent constraints
 

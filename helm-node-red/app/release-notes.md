@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.1
+
+- The catalog names the vendor, OpenJS Foundation, instead of logiccloud, which only packages the app.
+- New license file `license.txt`: the upstream license text, Apache-2.0 (Node-RED).
+- No change to the chart or images.
+
 ## 1.2.0
 
 - Margo rc3 ApplicationDescription (apiVersion v1, deviceConstraints); no change to the chart or images.

@@ -17,3 +17,4 @@ influxdb	docker.io/library/influxdb	2.9.1-alpine	sha256:f551adeb94b6f97626d2043e
 eclipse-mosquitto	docker.io/library/eclipse-mosquitto	2.1.2-alpine	sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408	helm-mosquitto	tags
 node-red	docker.io/nodered/node-red	4.1.2	sha256:216e7403aab9888f7e68de9e468fed31bb9d7b2d38117c08e645095a63658a2f	helm-node-red	chart
 traefik	docker.io/library/traefik	v3.7.19	sha256:aa942a00bce033c909bf1f7e861d93761be4b31a035f10d2410d33e38a8f41cf	helm-traefik	tags
+telegraf	docker.io/library/telegraf	1.40.3-alpine	sha256:10fe8c974752c8088858f012cb47b71f5bb67c5695829be56d87dfbf8e0092b8	helm-telegraf	tags

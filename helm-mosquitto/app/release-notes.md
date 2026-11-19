@@ -1,5 +1,11 @@
 # Release Notes
 
+## 2.2.1
+
+- The catalog names the vendor, Eclipse Foundation, instead of logiccloud, which only packages the app.
+- New license file `license.txt`: the upstream license text, EPL-2.0 OR EDL-1.0 (BSD-3-Clause) (Eclipse Mosquitto).
+- No change to the chart or images.
+
 ## 2.2.0
 
 - Margo rc3 ApplicationDescription (apiVersion v1, deviceConstraints); no change to the chart or images.
