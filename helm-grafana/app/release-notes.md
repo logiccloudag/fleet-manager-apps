@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.5.0
+
+- New setting `allowEmbedding` (section Sharing): `[security] allow_embedding` in `grafana.ini`, set through Grafana's environment override `GF_SECURITY_ALLOW_EMBEDDING`. `true` lets other web pages show Grafana in an iframe; `false` (the default, as in Grafana) keeps browsers from embedding it. An embedded dashboard still needs a login, or a public dashboard (`publicDashboards`).
+- Compose package 1.3.0. The chart is unchanged.
+
 ## 1.4.0
 
 - New setting `publicDashboards` (section Sharing): `[public_dashboards] enabled` in `grafana.ini`, set through Grafana's environment override `GF_PUBLIC_DASHBOARDS_ENABLED`. `true` (the default, as in Grafana) allows sharing a dashboard through a public link without login; `false` switches public dashboards off, and existing public links stop working.

@@ -36,8 +36,8 @@ escalation and dropped capabilities stay.
 - Versions have no suffix. App versions only need to be unique on this
   branch. Chart versions share the registry `ghcr.io/logiccloudag/margo-charts`
   with `main`, so a chart version belongs to one branch: this branch uses the
-  versions in `scripts/charts.tsv`, and `main` skips them (for example `main`
-  goes from `influxdb2-restricted` 0.2.0 to 0.4.0, because 0.3.0 is this
+  versions in `scripts/charts.tsv`, and `main` skips them (for example
+  `influxdb2-restricted` 0.2.0, 0.4.0 are `main`'s and 0.3.0, 0.5.0 this
   branch's). The publish scripts never overwrite a published tag, so a
   collision fails the publish instead of replacing the other branch's chart.
   Compose packages have no OpenShift-specific content, so both branches
@@ -94,7 +94,7 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | App (`id`) | Chart in `margo-charts` | Upstream chart | Chart license | Application and image | Type |
 | --- | --- | --- | --- | --- | --- |
 | `grafana` | `grafana-restricted` 0.1.0 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 (a dependency) | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | wrapper |
-| `influxdb` | `influxdb2-restricted` 0.3.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
+| `influxdb` | `influxdb2-restricted` 0.5.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
 | `mosquitto` | `mosquitto-restricted` 0.3.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red-restricted` 0.1.0 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 (a dependency) | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | wrapper |
 | `traefik` | `traefik-restricted` 0.3.0 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
@@ -236,6 +236,17 @@ must check both.
   - `pdb.create: false`;
   - the 2.9.1 image (the upstream default is 2.7.4).
 
+  It adds one template of its own: the Job `<release>-influxdb2-v1-databases-<revision>`
+  (`templates/v1-databases-job.yaml`, script `files/v1-databases.sh`). When
+  the parameter `v1Databases` is set, the Job creates the missing InfluxDB
+  1.x database mappings (DBRP, `bucket:database`) on every install and
+  upgrade, with the `influx` CLI of the same image and the operator token of
+  the chart's Secret. Its container has the InfluxDB container's security
+  context (no fixed IDs). The upstream chart has no hook for this, and its
+  `initScripts` run only on the first setup. InfluxDB already maps every
+  bucket to the database of the same name (virtual mappings), so the
+  parameter is only needed for another database name.
+
 ## Compose profile
 
 The package format is the "Compose Component Registry" of the Margo
@@ -293,6 +304,9 @@ Per app:
   on the first start with an empty volume only. An empty administrator
   password is generated then and stored, readable only by the influxdb user,
   in `/etc/influxdb2/generated-admin-password`; it is never logged.
+  `v1Databases` runs the steps of the Helm chart's Job in the background
+  after every start, against `127.0.0.1:8086` (the first setup runs on a
+  separate port), with the operator token that setup stored.
 - **Mosquitto.** Runs as UID 1883 with a read-only root file system. The
   configuration is written at start from the variables. A compose package
   carries no Secret, so the compose-only settings user name and password

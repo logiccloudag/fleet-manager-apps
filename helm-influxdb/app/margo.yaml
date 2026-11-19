@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.2.3"
+  version: "1.3.0"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
@@ -33,7 +33,7 @@ deploymentProfiles:
           # The wrapper chart in helm-influxdb/chart (it vendors the
           # unchanged influxdata/influxdb2 2.1.2 chart as a dependency).
           repository: oci://ghcr.io/logiccloudag/margo-charts/influxdb2-restricted
-          revision: "0.3.0"
+          revision: "0.5.0"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -52,7 +52,7 @@ deploymentProfiles:
           # The compose package built from helm-influxdb/compose
           # (scripts/publish-compose.sh).
           repository: oci://ghcr.io/logiccloudag/margo-compose/influxdb
-          revision: "1.0.1"
+          revision: "1.1.0"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -129,6 +129,22 @@ parameters:
         components: [influxdb]
       - pointer: DOCKER_INFLUXDB_INIT_RETENTION
         components: [influxdb-compose]
+  # InfluxDB 1.x (v1) databases mapped to buckets (DBRP mappings), for
+  # InfluxQL clients such as a Grafana data source with query language
+  # InfluxQL that expect a database name other than the bucket's. InfluxDB
+  # already maps every bucket to the database of the same name, so bucket
+  # "telegraf" is database "telegraf" without an entry. Comma separated
+  # entries "bucket:database", for example "default:telegraf". A missing
+  # bucket is created with the retention above. Mappings are added on every
+  # install, upgrade (Kubernetes: a Job) and start (compose); existing ones
+  # are kept, and removing an entry does not delete its mapping.
+  v1Databases:
+    value: ""
+    targets:
+      - pointer: v1Databases
+        components: [influxdb]
+      - pointer: INFLUXDB_V1_DATABASES
+        components: [influxdb-compose]
   servicePort:
     value: "8086"
     targets:
@@ -188,6 +204,11 @@ configuration:
           name: Retention of the initial bucket
           schema: text
           immutable: true
+    - name: InfluxQL (v1 compatibility)
+      settings:
+        - parameter: v1Databases
+          name: v1 databases mapped to buckets (bucket:database, comma separated; a bucket is already its own database)
+          schema: optionalText
     - name: Service and storage
       settings:
         - parameter: servicePort
