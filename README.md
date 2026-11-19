@@ -72,6 +72,14 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | `traefik` | `traefik-restricted` 0.2.3 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.19, copy of `docker.io/library/traefik:v3.7.19` (MIT) | local |
 | `telegraf` | `telegraf-restricted` 0.2.0 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
 
+The `rc2` branch publishes to the same chart registry. A chart version
+belongs to one branch, so `main` never uses a chart version from `rc2`'s
+`scripts/charts.tsv` (`grafana-restricted` 0.1.0, `influxdb2-restricted`
+0.3.0, `mosquitto-restricted` 0.3.0, `node-red-restricted` 0.1.0,
+`traefik-restricted` 0.3.0, `telegraf-restricted` 0.3.0): the next
+`influxdb2-restricted` on `main` is 0.4.0, for example. `mirror-charts.sh`
+refuses to overwrite a tag with different content.
+
 `grafana`, `influxdb`, `mosquitto`, `node-red` and `telegraf` also have a
 compose package; its version is the `revision` of the compose component in
 `app/margo.yaml`. Traefik has no compose profile: it is a Kubernetes ingress
