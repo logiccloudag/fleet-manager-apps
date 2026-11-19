@@ -8,7 +8,7 @@ description: >-
   parameters reach the agent as strings only, so these values cannot be
   removed through parameters.
 type: application
-version: 0.1.0-openshift.1
+version: 0.1.0
 appVersion: "13.2.4"
 kubeVersion: ^1.25.0-0
 home: https://github.com/logiccloudag/fleet-manager-apps

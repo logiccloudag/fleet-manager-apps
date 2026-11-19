@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.2.2-openshift.1"
+  version: "1.2.3"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
@@ -33,7 +33,7 @@ deploymentProfiles:
           # The wrapper chart in helm-influxdb/chart (it vendors the
           # unchanged influxdata/influxdb2 2.1.2 chart as a dependency).
           repository: oci://ghcr.io/logiccloudag/margo-charts/influxdb2-restricted
-          revision: "0.3.0-openshift.1"
+          revision: "0.3.0"
           wait: true
           timeout: "10m0s"
     requiredResources:

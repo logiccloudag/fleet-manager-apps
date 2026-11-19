@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.3
+
+- Versions no longer carry the `-openshift.<n>` suffix: the app is 1.2.3 and the chart influxdb2-restricted 0.3.0. The chart is unchanged apart from its version.
+
 ## 1.2.2-openshift.1
 
 - Compose package 1.0.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/influxdb:2.9.1-alpine`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.

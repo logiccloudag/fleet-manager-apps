@@ -18,9 +18,19 @@ agent:
   interval: 10s
   flushInterval: 10s
 
-# "true": CPU, memory and system (load, uptime) metrics. A container sees
-# the host's /proc, so these are the node's figures.
+# "true": CPU, memory, swap, system (load, uptime), kernel, process, disk
+# and disk I/O metrics. The kernel does not separate CPU, memory, kernel and
+# disk I/O figures per container, so these are the node's. Processes and
+# file systems are the pod's: Pod Security "restricted" forbids the hostPath
+# and hostPID that the node's would need.
 systemMetrics: true
+
+# "true": network interface and connection metrics, of the pod's network
+# (Pod Security "restricted" forbids hostNetwork).
+networkMetrics: true
+
+# "true": temperature sensors (inputs.temp) from /sys, for example the SoC.
+temperatureMetrics: false
 
 # Prometheus endpoint (outputs.prometheus_client). Always on: it is also
 # the readiness and liveness probe. Must be 1024 or higher: the container
@@ -51,8 +61,9 @@ mqtt:
 influxdb:
   # For example http://influxdb-influxdb2:8086.
   url: ""
-  organization: ""
-  bucket: ""
+  # The organization and bucket that the InfluxDB app creates by default.
+  organization: influxdata
+  bucket: default
   # Name of an existing Secret in the release namespace with the API token.
   existingSecret: ""
   tokenKey: token

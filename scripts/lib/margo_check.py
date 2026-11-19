@@ -704,8 +704,24 @@ def check_archive(path, top):
             fail(f"archive: {m.name}: setuid, setgid or sticky bit")
 
 
-def compose_rules(compose, refs, registry):
-    """The compose file rules of this catalog."""
+COMPOSE_OPT_IN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*):-([^}]*)\}$")
+
+
+def opt_in(value, targets):
+    """(var, default) when value is exactly ${VAR:-default} and VAR is a
+    compose target, so a Margo parameter chooses the value; else None."""
+    m = COMPOSE_OPT_IN.match(str(value))
+    return (m.group(1), m.group(2)) if m and m.group(1) in targets else None
+
+
+def compose_rules(compose, refs, registry, targets):
+    """The compose file rules of this catalog.
+
+    Host access (host network, a read-only bind mount) is allowed only as an
+    opt-in: the field is exactly ${VAR:-default}, VAR is the compose target
+    of a Margo parameter, and the default (the parameter value) gives no
+    host access. The deployment then has no host access unless whoever
+    deploys it sets that parameter."""
     services = compose.get("services") or {}
     if not services:
         fail("compose.yaml: no services")
@@ -724,14 +740,40 @@ def compose_rules(compose, refs, registry):
         if "no-new-privileges:true" not in (svc.get("security_opt") or []):
             fail(f"{where}: security_opt does not contain no-new-privileges:true")
         for field in ("network_mode", "pid", "ipc", "userns_mode"):
-            if str(svc.get(field, "")).startswith("host"):
-                fail(f"{where}: {field} host")
+            value = str(svc.get(field, ""))
+            choice = opt_in(value, targets) if field == "network_mode" else None
+            if choice:
+                var, default = choice
+                if default.startswith(("host", "container:", "service:")) or "$" in default:
+                    fail(f"{where}: network_mode ${{{var}}} must default to a network without host access, not {default!r}")
+                else:
+                    ok(f"{where}: network_mode is an opt-in (parameter {targets[var][0]}, default {default})")
+            elif value.startswith("host") or "$" in value:
+                fail(f"{where}: {field} {value}")
         if svc.get("devices"):
             fail(f"{where}: devices are not allowed")
+        named = compose.get("volumes") or {}
         for v in svc.get("volumes") or []:
-            source = v.get("source", "") if isinstance(v, dict) else str(v).split(":", 1)[0]
+            if isinstance(v, dict):
+                source, rest = v.get("source", ""), ""
+            else:
+                # A ${VAR:-default} source contains a colon itself.
+                text = str(v)
+                end = text.find("}") + 1 if text.startswith("${") else 0
+                source, _, rest = text[end:].partition(":")
+                source = text[:end] + source
             vtype = v.get("type") if isinstance(v, dict) else None
-            if vtype == "bind" or source.startswith(("/", ".", "~", "$")):
+            choice = None if isinstance(v, dict) else opt_in(source, targets)
+            if choice:
+                var, default = choice
+                mode = rest.split(":")[1:]
+                if default not in named:
+                    fail(f"{where}: volume ${{{var}}} must default to a named volume of compose.yaml, not {default!r}")
+                elif "ro" not in ",".join(mode).split(","):
+                    fail(f"{where}: volume {v!r} with a parameter source must be read-only (:ro)")
+                else:
+                    ok(f"{where}: read-only bind mount is an opt-in (parameter {targets[var][0]}, default volume {default})")
+            elif vtype == "bind" or source.startswith(("/", ".", "~", "$")):
                 fail(f"{where}: bind mount {v!r} (a compose package must not use bind mounts)")
         for secret in svc.get("secrets") or []:
             fail(f"{where}: secrets are not allowed in a compose package ({secret!r})")
@@ -768,20 +810,21 @@ def cmd_compose(margo_path, app_dir, images_tsv, registry, out_dir):
         return
     check_archive(archive, name)
 
-    with open(compose_file, encoding="utf-8") as f:
-        text = f.read()
-    compose = yaml.safe_load(text) or {}
-    compose_rules(compose, load_images(images_tsv, os.path.basename(os.path.normpath(app_dir))), registry)
-
-    # Variables against compose targets. Comment lines are not compose
-    # content, so they are left out.
-    body = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
     params = doc.get("parameters") or {}
     targets = {}
     for key, param in params.items():
         for target in param.get("targets") or []:
             if name in (target.get("components") or []):
                 targets[target.get("pointer")] = (key, "" if param.get("value") is None else str(param.get("value")))
+
+    with open(compose_file, encoding="utf-8") as f:
+        text = f.read()
+    compose = yaml.safe_load(text) or {}
+    compose_rules(compose, load_images(images_tsv, os.path.basename(os.path.normpath(app_dir))), registry, targets)
+
+    # Variables against compose targets. Comment lines are not compose
+    # content, so they are left out.
+    body = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
     used = {}
     for m in COMPOSE_VARIABLE.finditer(body):
         var, op, default = m.group(1), m.group(2), m.group(3)

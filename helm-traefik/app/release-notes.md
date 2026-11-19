@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.2
+
+- Versions no longer carry the `-openshift.<n>` suffix: the app is 1.2.2 and the chart traefik-restricted 0.3.0. The chart is unchanged apart from its version.
+
 ## 1.2.1-openshift.1
 
 - The catalog names the vendor, Traefik Labs, instead of logiccloud, which only packages the app.
