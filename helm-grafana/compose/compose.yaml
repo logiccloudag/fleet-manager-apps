@@ -26,6 +26,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-}
       # [public_dashboards] enabled: "true" or "false".
       GF_PUBLIC_DASHBOARDS_ENABLED: ${GF_PUBLIC_DASHBOARDS_ENABLED:-true}
+      # [security] allow_embedding: "true" or "false".
+      GF_SECURITY_ALLOW_EMBEDDING: ${GF_SECURITY_ALLOW_EMBEDDING:-false}
     volumes:
       - grafana-data:/var/lib/grafana
 

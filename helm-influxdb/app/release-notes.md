@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.3.0
+
+- New setting `v1Databases` (section InfluxQL): InfluxDB 1.x (v1) databases mapped to buckets (DBRP mappings), for InfluxQL clients such as a Grafana data source with query language InfluxQL, and dashboards written in InfluxQL, that expect a database name other than the bucket's. InfluxDB already maps every bucket to the database of the same name (virtual mappings), so the bucket `telegraf` is the database `telegraf` without an entry. Comma separated entries `bucket:database`, for example `default:telegraf`; empty by default. A missing bucket is created with the initial bucket's retention.
+- The mappings are added on every install and upgrade (Kubernetes: a Job of the chart with the operator token) and after every start (compose: in the background). Existing mappings are kept, so this also works for an existing installation; removing an entry does not delete its mapping.
+- Chart influxdb2-restricted 0.5.0, compose package 1.1.0.
+
 ## 1.2.3
 
 - Versions no longer carry the `-openshift.<n>` suffix: the app is 1.2.3 and the chart influxdb2-restricted 0.3.0. The chart is unchanged apart from its version.
