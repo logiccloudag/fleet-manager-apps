@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.3.0
+
+- New setting `v1Databases` (section InfluxQL): InfluxDB 1.x (v1) databases mapped to buckets (DBRP mappings), for InfluxQL clients such as a Grafana data source with query language InfluxQL, and dashboards written in InfluxQL, that expect a database name other than the bucket's. InfluxDB already maps every bucket to the database of the same name (virtual mappings), so the bucket `telegraf` is the database `telegraf` without an entry. Comma separated entries `bucket:database`, for example `default:telegraf`; empty by default. A missing bucket is created with the initial bucket's retention.
+- The mappings are added on every install and upgrade (Kubernetes: a Job of the chart with the operator token) and after every start (compose: in the background). Existing mappings are kept, so this also works for an existing installation; removing an entry does not delete its mapping.
+- Chart influxdb2-restricted 0.4.0, compose package 1.1.0.
+
 ## 1.2.2
 
 - Compose package 1.0.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/influxdb:2.9.1-alpine`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.
