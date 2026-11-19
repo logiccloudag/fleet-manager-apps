@@ -527,7 +527,9 @@ on any failure. The stages for each app are:
    - a mirror chart: the fixed image parameters in `app/margo.yaml`;
    - a wrapper or local chart: `values.yaml`, and bump the chart `version`
      (in `Chart.yaml`, `scripts/charts.tsv` and `revision`);
-   - `compose/compose.yaml`, and bump the compose `revision`.
+   - `compose/compose.yaml` (here `ghcr.io/logiccloudag/margo-images/<name>:<tag>`,
+     without `@<digest>`: the FLECS device agent rejects a reference with both
+     a tag and a digest), and bump the compose `revision`.
 4. Bump `metadata.version` and add release notes. `scripts/check.sh` fails
    on any reference that does not match `scripts/images.tsv`.
 

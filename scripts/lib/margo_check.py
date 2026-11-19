@@ -705,6 +705,24 @@ def check_images(where, images, refs, registry):
             fail(f"{where}: image {image!r} is not <{registry}/name:tag@digest> of a row of scripts/images.tsv for this app")
 
 
+def check_compose_images(where, images, refs, registry):
+    """Every compose image is <registry>/<name>:<tag> of a pin of the app, with
+    no @digest. The FLECS device agent rejects a reference that carries both a
+    tag and a digest (Docker answers 400 "invalid reference format"), and one
+    failed download aborts every other deployment on the device. The tag is
+    still immutable: margo-images is published only by scripts/mirror-images.sh,
+    which never overwrites a tag and checks it against the digest in
+    scripts/images.tsv."""
+    allowed = {f"{registry}/{n}:{t}" for (n, t, _d) in refs}
+    for image in images:
+        if image in allowed:
+            ok(f"{where}: image {image} (pinned in scripts/images.tsv)")
+        elif isinstance(image, str) and "@" in image:
+            fail(f"{where}: image {image!r} has a digest; a compose image is <{registry}/name:tag> without @digest (the FLECS agent rejects tag@digest)")
+        else:
+            fail(f"{where}: image {image!r} is not <{registry}/name:tag> of a row of scripts/images.tsv for this app")
+
+
 def cmd_rendered(manifest_path, margo_path, images_tsv=None, registry=None, app_dir_name=None):
     archs = []
     for profile in profiles_of(load_yaml(margo_path)):
@@ -838,7 +856,7 @@ def compose_rules(compose, refs, registry):
                 fail(f"{where}: bind mount {v!r} (a compose package must not use bind mounts)")
         for secret in svc.get("secrets") or []:
             fail(f"{where}: secrets are not allowed in a compose package ({secret!r})")
-        check_images(where, [svc.get("image")], refs, registry)
+        check_compose_images(where, [svc.get("image")], refs, registry)
     for secret_name, secret in (compose.get("secrets") or {}).items():
         if isinstance(secret, dict) and "file" in secret:
             fail(f"compose.yaml: file-source secret {secret_name!r} is not allowed")

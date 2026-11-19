@@ -2,7 +2,7 @@ apiVersion: v1
 id: node-red
 metadata:
   name: Node-RED
-  version: "1.2.1"
+  version: "1.2.2"
   description: >-
     Node-RED 4 low-code flow editor for wiring devices, APIs and services,
     installed from the upstream schwarzit Helm chart. Runs under Pod Security
@@ -50,7 +50,7 @@ deploymentProfiles:
           # The compose package built from helm-node-red/compose
           # (scripts/publish-compose.sh).
           repository: oci://ghcr.io/logiccloudag/margo-compose/node-red
-          revision: "1.0.0"
+          revision: "1.0.1"
           wait: true
           timeout: "10m0s"
     deviceConstraints:
