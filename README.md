@@ -66,7 +66,7 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | App (`id`) | Chart in `margo-charts` | Upstream chart | Chart license | Application and image | Type |
 | --- | --- | --- | --- | --- | --- |
 | `grafana` | `grafana` 13.7.0 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | mirror |
-| `influxdb` | `influxdb2-restricted` 0.2.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
+| `influxdb` | `influxdb2-restricted` 0.4.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
 | `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
 | `traefik` | `traefik-restricted` 0.2.3 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.19, copy of `docker.io/library/traefik:v3.7.19` (MIT) | local |
@@ -75,9 +75,9 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 The `rc2` branch publishes to the same chart registry. A chart version
 belongs to one branch, so `main` never uses a chart version from `rc2`'s
 `scripts/charts.tsv` (`grafana-restricted` 0.1.0, `influxdb2-restricted`
-0.3.0, `mosquitto-restricted` 0.3.0, `node-red-restricted` 0.1.0,
+0.3.0 and 0.5.0, `mosquitto-restricted` 0.3.0, `node-red-restricted` 0.1.0,
 `traefik-restricted` 0.3.0, `telegraf-restricted` 0.3.0): the next
-`influxdb2-restricted` on `main` is 0.4.0, for example. `mirror-charts.sh`
+`influxdb2-restricted` on `main` is 0.6.0, for example. `mirror-charts.sh`
 refuses to overwrite a tag with different content.
 
 `grafana`, `influxdb`, `mosquitto`, `node-red` and `telegraf` also have a
@@ -216,6 +216,16 @@ must check both.
   - `pdb.create: false`;
   - the 2.9.1 image (the upstream default is 2.7.4).
 
+  It adds one template of its own: the Job `<release>-influxdb2-v1-databases-<revision>`
+  (`templates/v1-databases-job.yaml`, script `files/v1-databases.sh`). When
+  the parameter `v1Databases` is set, the Job creates the missing InfluxDB
+  1.x database mappings (DBRP, `bucket:database`) on every install and
+  upgrade, with the `influx` CLI of the same image and the operator token of
+  the chart's Secret. The upstream chart has no hook for this, and its
+  `initScripts` run only on the first setup. InfluxDB already maps every
+  bucket to the database of the same name (virtual mappings), so the
+  parameter is only needed for another database name.
+
 ## Compose profile
 
 The package format is the "Compose Component Registry" of the Margo
@@ -273,6 +283,9 @@ Per app:
   on the first start with an empty volume only. An empty administrator
   password is generated then and stored, readable only by the influxdb user,
   in `/etc/influxdb2/generated-admin-password`; it is never logged.
+  `v1Databases` runs the steps of the Helm chart's Job in the background
+  after every start, against `127.0.0.1:8086` (the first setup runs on a
+  separate port), with the operator token that setup stored.
 - **Mosquitto.** Runs as UID 1883 with a read-only root file system. The
   configuration is written at start from the variables. A compose package
   carries no Secret, so the compose-only settings user name and password

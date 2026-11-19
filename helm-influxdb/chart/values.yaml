@@ -6,6 +6,19 @@
 # "restricted" (booleans, user IDs, the capability list) therefore live here,
 # not in app/margo.yaml. The string values an operator may change (password,
 # organisation, sizes, resources) are Margo parameters.
+
+# InfluxDB 1.x (v1) databases mapped to buckets (DBRP mappings), for
+# InfluxQL clients that expect a database name other than the bucket's
+# (InfluxDB already maps every bucket to the database of the same name).
+# Comma separated entries "bucket:database". A missing bucket is created
+# with the initial bucket's retention. Empty: no Job, no mapping. A Job of
+# this chart (templates/v1-databases-job.yaml) creates the missing mappings
+# on every install and upgrade.
+v1Databases: ""
+
+# Pod security context of that Job (the InfluxDB container's settings
+# below apply to its container as well).
+podSecurityContext: {}
 influxdb2:
   image:
     # The copy of docker.io/library/influxdb in the catalog's image registry

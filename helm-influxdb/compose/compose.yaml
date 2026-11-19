@@ -32,6 +32,11 @@ services:
       DOCKER_INFLUXDB_INIT_RETENTION: ${DOCKER_INFLUXDB_INIT_RETENTION:-0s}
       # Empty: setup generates the operator token.
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN:-}
+      # InfluxDB 1.x (v1) databases mapped to buckets (DBRP mappings), for
+      # InfluxQL clients that expect another database name than the bucket's:
+      # comma separated "bucket:database". Added after every start; existing
+      # mappings are kept. Empty: none.
+      INFLUXDB_V1_DATABASES: ${INFLUXDB_V1_DATABASES:-}
     # Setup needs a password. When the parameter is empty, the first start
     # generates one and stores it, readable only by the influxdb user, in
     # /etc/influxdb2/generated-admin-password; it is never logged:
@@ -47,6 +52,68 @@ services:
           DOCKER_INFLUXDB_INIT_PASSWORD="$$(cat /etc/influxdb2/generated-admin-password)"
           export DOCKER_INFLUXDB_INIT_PASSWORD
           echo "Generated the administrator password in /etc/influxdb2/generated-admin-password"
+        fi
+        # The v1 database mappings, in the background once influxd serves on
+        # 8086 (the first setup runs on a separate port). The same steps as
+        # the Job of the Helm chart (chart/files/v1-databases.sh); the influx
+        # CLI uses the operator token that setup stored in its configuration.
+        if [ -n "$${INFLUXDB_V1_DATABASES//[[:space:]]/}" ]; then
+          (
+            export INFLUX_HOST=http://127.0.0.1:8086 INFLUX_ORG="$${DOCKER_INFLUXDB_INIT_ORG}"
+            export INFLUXDB_V1_RETENTION="$${DOCKER_INFLUXDB_INIT_RETENTION}"
+            if [ -n "$${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}" ]; then
+              export INFLUX_TOKEN="$${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+            fi
+            # errexit applies inside the attempt only; a failed attempt is retried.
+            set +e
+            for attempt in 1 2 3 4 5; do
+              (
+              set -euo pipefail
+              name='^[A-Za-z0-9._-]+$$'
+              entries=()
+              IFS=, read -ra raw <<<"$${INFLUXDB_V1_DATABASES}"
+              for entry in "$${raw[@]}"; do
+                entry="$${entry//[[:space:]]/}"
+                [ -n "$${entry}" ] || continue
+                bucket="$${entry%%:*}"
+                database="$${entry#*:}"
+                if [[ "$${entry}" != *:* ]] || ! [[ "$${bucket}" =~ $${name} && "$${database}" =~ $${name} ]]; then
+                  echo "ERROR: v1 database entry '$${entry}' must be bucket:database (letters, digits, '.', '_', '-')" >&2
+                  exit 1
+                fi
+                entries+=("$${bucket}:$${database}")
+              done
+              for _ in $$(seq 1 60); do
+                influx bucket list --hide-headers >/dev/null 2>&1 && break
+                sleep 5
+              done
+              if ! influx bucket list --hide-headers >/dev/null; then
+                echo "ERROR: InfluxDB at $${INFLUX_HOST} does not answer with the operator token" >&2
+                exit 1
+              fi
+              for entry in "$${entries[@]}"; do
+                bucket="$${entry%%:*}"
+                database="$${entry#*:}"
+                # Only the real mappings count: the CLI lists the virtual ones after them.
+                if influx v1 dbrp list --db "$${database}" --json | sed '/VIRTUAL DBRP MAPPINGS/,$$d' | grep -q '"database"'; then
+                  echo "v1 database $${database} is already mapped"
+                  continue
+                fi
+                id="$$(influx bucket list --name "$${bucket}" --hide-headers 2>/dev/null | awk 'NR == 1 { print $$1 }' || true)"
+                if [ -z "$${id}" ]; then
+                  id="$$(influx bucket create --name "$${bucket}" --retention "$${INFLUXDB_V1_RETENTION}" --hide-headers | awk 'NR == 1 { print $$1 }')"
+                  echo "Created bucket $${bucket} (retention $${INFLUXDB_V1_RETENTION})"
+                fi
+                influx v1 dbrp create --bucket-id "$${id}" --db "$${database}" --rp autogen --default --hide-headers >/dev/null
+                echo "Mapped v1 database $${database} (retention policy autogen) to bucket $${bucket}"
+              done
+              )
+              [ "$$?" != 0 ] || exit 0
+              echo "v1 database mappings: attempt $$attempt failed, retrying in 30s" >&2
+              sleep 30
+            done
+            echo "ERROR: the v1 database mappings failed; InfluxDB keeps running without them" >&2
+          ) &
         fi
         exec /entrypoint.sh influxd
     healthcheck:

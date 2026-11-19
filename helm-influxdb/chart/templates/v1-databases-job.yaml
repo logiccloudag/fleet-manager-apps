@@ -1,0 +1,70 @@
+{{- /*
+The v1 database mappings (v1Databases): a Job on every install and upgrade
+runs files/v1-databases.sh with the influx CLI of the same image against
+the InfluxDB Service, with the operator token of the chart's Secret. The
+upstream chart has no hook for this, and its initScripts run only on the
+first setup. Each revision gets its own Job; a finished Job is deleted
+after a day.
+*/ -}}
+{{- $databases := trim (toString .Values.v1Databases) }}
+{{- if $databases }}
+{{- range splitList "," $databases }}
+{{- $entry := trim . }}
+{{- if and $entry (not (regexMatch "^[A-Za-z0-9._-]+:[A-Za-z0-9._-]+$" $entry)) }}
+{{- fail (printf "v1Databases: the entry %q must be bucket:database (letters, digits, '.', '_', '-')" $entry) }}
+{{- end }}
+{{- end }}
+{{- $influx := .Values.influxdb2 }}
+{{- $fullname := include "influxdb.fullname" (dict "Values" $influx "Release" .Release "Chart" (dict "Name" "influxdb2")) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-v1-databases-%d" ($fullname | trunc 40 | trimSuffix "-") .Release.Revision }}
+  labels:
+    app.kubernetes.io/name: influxdb2-v1-databases
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: influxdb2-v1-databases
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: v1-databases
+          image: "{{ $influx.image.repository }}:{{ $influx.image.tag }}"
+          imagePullPolicy: {{ $influx.image.pullPolicy | default "IfNotPresent" }}
+          command: ["/bin/bash", "-c", {{ .Files.Get "files/v1-databases.sh" | quote }}]
+          env:
+            - name: INFLUXDB_V1_DATABASES
+              value: {{ $databases | quote }}
+            - name: INFLUXDB_V1_RETENTION
+              value: {{ $influx.adminUser.retention_policy | toString | quote }}
+            - name: INFLUX_HOST
+              value: {{ printf "http://%s:%d" $fullname (int $influx.service.port) | quote }}
+            - name: INFLUX_ORG
+              value: {{ $influx.adminUser.organization | toString | quote }}
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $influx.adminUser.existingSecret | default (printf "%s-auth" $fullname) }}
+                  key: admin-token
+          {{- with $influx.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+{{- end }}
