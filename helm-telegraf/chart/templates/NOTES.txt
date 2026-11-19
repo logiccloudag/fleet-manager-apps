@@ -1,0 +1,10 @@
+Telegraf {{ .Chart.AppVersion }} serves its metrics on http://{{ include "telegraf.fullname" . }}.{{ .Release.Namespace }}.svc:{{ int .Values.service.port }}/metrics.
+{{- if trim (toString .Values.mqtt.servers) }}
+It consumes the MQTT topics {{ .Values.mqtt.topics }} from {{ .Values.mqtt.servers }}.
+{{- end }}
+{{- if trim (toString .Values.influxdb.url) }}
+It writes to InfluxDB {{ .Values.influxdb.url }}, bucket {{ .Values.influxdb.bucket }}.
+{{- if not .Values.influxdb.existingSecret }}
+WARNING: influxdb.existingSecret is empty, so Telegraf sends no API token.
+{{- end }}
+{{- end }}

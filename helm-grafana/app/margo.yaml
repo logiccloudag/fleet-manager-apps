@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: grafana
 metadata:
   name: Grafana
-  version: "1.3.0-openshift.1"
+  version: "1.3.1-openshift.1"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
@@ -13,11 +13,12 @@ metadata:
     A compose profile runs the same image with Docker Compose.
   catalog:
     organization:
-      - name: logiccloud
-        site: https://logiccloud.io
+      - name: Grafana Labs
+        site: https://grafana.com
     application:
       tagline: Dashboards and visualisation for metrics, logs and time series.
       icon: icon.png
+      licenseFile: license.txt
       releaseNotes: release-notes.md
       site: https://grafana.com/oss/grafana/
       tags:

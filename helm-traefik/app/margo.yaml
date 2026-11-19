@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: traefik
 metadata:
   name: Traefik
-  version: "1.2.0-openshift.1"
+  version: "1.2.1-openshift.1"
   description: >-
     Traefik 3.7 ingress controller from the official traefik image, installed
     from traefik-restricted, a small logiccloud chart. It serves the
@@ -15,11 +15,12 @@ metadata:
     KA-211).
   catalog:
     organization:
-      - name: logiccloud
-        site: https://logiccloud.io
+      - name: Traefik Labs
+        site: https://traefik.io
     application:
       tagline: Ingress controller for the apps on a device.
       icon: icon.png
+      licenseFile: license.txt
       releaseNotes: release-notes.md
       site: https://traefik.io/traefik
       tags:
