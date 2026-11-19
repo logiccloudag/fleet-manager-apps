@@ -1,5 +1,11 @@
 # Release Notes
 
+## 2.2.1-openshift.1
+
+- The catalog names the vendor, Eclipse Foundation, instead of logiccloud, which only packages the app.
+- New license file `license.txt`: the upstream license text, EPL-2.0 OR EDL-1.0 (BSD-3-Clause) (Eclipse Mosquitto).
+- No change to the chart or images.
+
 ## 2.2.0-openshift.1
 
 - Chart: mosquitto-restricted 0.3.0-openshift.1. The fixed `runAsUser`, `runAsGroup` and `fsGroup` (1883) are removed, because OpenShift's restricted SCC rejects them. OpenShift assigns these IDs from the namespace's UID range. The init container runs with the broker's UID, so the password file stays owned by the broker.

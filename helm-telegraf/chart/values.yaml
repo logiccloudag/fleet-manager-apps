@@ -1,0 +1,74 @@
+# Values of telegraf-restricted. The kubernetes-agent sets every Margo
+# parameter as a string, so the templates read booleans with
+# `eq (toString ...) "true"` and numbers with `int`. The Pod Security
+# settings are fixed in the templates and are not values.
+
+image:
+  # The copy of docker.io/library/telegraf in the catalog's image registry
+  # (scripts/images.tsv).
+  repository: ghcr.io/logiccloudag/margo-images/telegraf
+  tag: 1.40.3-alpine
+  # Multi-arch index digest of 1.40.3-alpine (amd64, arm64), the same as
+  # upstream. When set, the image is pulled by digest.
+  digest: sha256:10fe8c974752c8088858f012cb47b71f5bb67c5695829be56d87dfbf8e0092b8
+  pullPolicy: IfNotPresent
+
+agent:
+  # Collection and flush interval (Telegraf duration).
+  interval: 10s
+  flushInterval: 10s
+
+# "true": CPU, memory and system (load, uptime) metrics. A container sees
+# the host's /proc, so these are the node's figures.
+systemMetrics: true
+
+# Prometheus endpoint (outputs.prometheus_client). Always on: it is also
+# the readiness and liveness probe. Must be 1024 or higher: the container
+# runs without capabilities.
+prometheus:
+  port: 9273
+
+service:
+  # ClusterIP, NodePort or LoadBalancer.
+  type: ClusterIP
+  port: 9273
+
+# inputs.mqtt_consumer. Empty servers: no MQTT input.
+mqtt:
+  # Comma separated broker URLs, for example tcp://mosquitto:1883.
+  servers: ""
+  # Comma separated topics, for example sensors/#.
+  topics: "telegraf/#"
+  # Telegraf input data format: influx, json, value, ...
+  dataFormat: influx
+  # Name of an existing Secret in the release namespace with the broker
+  # credentials. Empty: no credentials.
+  existingSecret: ""
+  usernameKey: username
+  passwordKey: password
+
+# outputs.influxdb_v2. Empty url: no InfluxDB output.
+influxdb:
+  # For example http://influxdb-influxdb2:8086.
+  url: ""
+  organization: ""
+  bucket: ""
+  # Name of an existing Secret in the release namespace with the API token.
+  existingSecret: ""
+  tokenKey: token
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+# Extra lines appended to telegraf.conf (TOML).
+extraConfig: ""
+
+# Extra keys of the pod's securityContext, for example runAsUser and
+# runAsGroup on a cluster without OpenShift's UID assignment. Empty on
+# OpenShift: its restricted SCC rejects fixed IDs. Typed values only, so a
+# Margo parameter cannot set them (scripts/check.sh uses ci/cluster-values.yaml).
+podSecurityContext: {}

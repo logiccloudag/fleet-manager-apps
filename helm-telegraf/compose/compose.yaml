@@ -1,0 +1,135 @@
+# Compose package of the Telegraf app: the component telegraf-compose of
+# the compose deployment profile in app/margo.yaml.
+#
+# Each Margo parameter of this profile targets an environment variable
+# (Target.pointer). The Margo spec does not say whether the device sets the
+# variable in the container environment or uses it for ${VAR} interpolation
+# here, so each variable has the same name in both places and its default
+# here equals the parameter value in app/margo.yaml (scripts/check.sh checks
+# that). TELEGRAF_PORT only works through interpolation.
+#
+# telegraf.conf is written at start from these variables, like the
+# ConfigMap of the Helm profile. A Margo compose package must not carry
+# file-source secrets, so the MQTT credentials and the InfluxDB token are
+# plain parameters here; Telegraf reads them from the environment
+# (${VAR} in telegraf.conf), so they are not written to the file.
+services:
+  telegraf:
+    image: ghcr.io/logiccloudag/margo-images/telegraf:1.40.3-alpine@sha256:10fe8c974752c8088858f012cb47b71f5bb67c5695829be56d87dfbf8e0092b8
+    restart: unless-stopped
+    # A non-root UID, a read-only root file system and no capability, like
+    # the Helm profile. The Prometheus port must be 1024 or higher.
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${TELEGRAF_PORT:-9273}:${TELEGRAF_LISTENER_PORT:-9273}"
+    environment:
+      TELEGRAF_LISTENER_PORT: ${TELEGRAF_LISTENER_PORT:-9273}
+      TELEGRAF_INTERVAL: ${TELEGRAF_INTERVAL:-10s}
+      TELEGRAF_FLUSH_INTERVAL: ${TELEGRAF_FLUSH_INTERVAL:-10s}
+      # "true": CPU, memory and system metrics of the host.
+      TELEGRAF_SYSTEM_METRICS: ${TELEGRAF_SYSTEM_METRICS:-true}
+      # Comma separated. Empty MQTT_SERVERS: no MQTT input.
+      MQTT_SERVERS: ${MQTT_SERVERS:-}
+      MQTT_TOPICS: ${MQTT_TOPICS:-telegraf/#}
+      MQTT_DATA_FORMAT: ${MQTT_DATA_FORMAT:-influx}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      # Empty INFLUX_URL: no InfluxDB output.
+      INFLUX_URL: ${INFLUX_URL:-}
+      INFLUX_ORG: ${INFLUX_ORG:-}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-}
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$${TELEGRAF_LISTENER_PORT}/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        conf=/tmp/telegraf.conf
+        # Every value that goes into a TOML string is checked first: a double
+        # quote or a backslash could inject configuration.
+        for value in "$${TELEGRAF_INTERVAL}" "$${TELEGRAF_FLUSH_INTERVAL}" "$${MQTT_SERVERS}" \
+          "$${MQTT_TOPICS}" "$${MQTT_DATA_FORMAT}" "$${INFLUX_URL}" "$${INFLUX_ORG}" "$${INFLUX_BUCKET}"; do
+          case "$$value" in
+            *'"'* | *'\'*)
+              echo "ERROR: the value '$$value' must not contain a double quote or a backslash" >&2
+              exit 1
+              ;;
+          esac
+        done
+        # toml <value>: a TOML string (the value is checked above).
+        toml() {
+          printf '"%s"' "$$1"
+        }
+        # toml_list <comma separated>: a TOML string array, empty items dropped.
+        toml_list() {
+          out=""
+          old_ifs="$$IFS"
+          IFS=,
+          for item in $$1; do
+            item="$$(printf '%s' "$$item" | sed 's/^ *//; s/ *$$//')"
+            [ -n "$$item" ] || continue
+            out="$${out:+$$out, }$$(toml "$$item")"
+          done
+          IFS="$$old_ifs"
+          printf '[%s]' "$$out"
+        }
+        case "$${TELEGRAF_LISTENER_PORT}" in
+          '' | *[!0-9]*)
+            echo "ERROR: TELEGRAF_LISTENER_PORT must be a number" >&2
+            exit 1
+            ;;
+        esac
+        if [ "$${TELEGRAF_LISTENER_PORT}" -lt 1024 ] || [ "$${TELEGRAF_LISTENER_PORT}" -gt 65535 ]; then
+          echo "ERROR: TELEGRAF_LISTENER_PORT must be between 1024 and 65535" >&2
+          exit 1
+        fi
+        {
+          echo "[agent]"
+          echo "  interval = $$(toml "$${TELEGRAF_INTERVAL}")"
+          echo "  flush_interval = $$(toml "$${TELEGRAF_FLUSH_INTERVAL}")"
+          echo "  omit_hostname = false"
+          echo "[[inputs.internal]]"
+          if [ "$${TELEGRAF_SYSTEM_METRICS}" = true ]; then
+            echo "[[inputs.cpu]]"
+            echo "  percpu = false"
+            echo "  totalcpu = true"
+            echo "[[inputs.mem]]"
+            echo "[[inputs.system]]"
+          fi
+          if [ -n "$${MQTT_SERVERS}" ]; then
+            echo "[[inputs.mqtt_consumer]]"
+            echo "  servers = $$(toml_list "$${MQTT_SERVERS}")"
+            echo "  topics = $$(toml_list "$${MQTT_TOPICS}")"
+            echo "  data_format = $$(toml "$${MQTT_DATA_FORMAT}")"
+            if [ -n "$${MQTT_USERNAME}" ]; then
+              echo '  username = "$${MQTT_USERNAME}"'
+              echo '  password = "$${MQTT_PASSWORD}"'
+            fi
+          fi
+          echo "[[outputs.prometheus_client]]"
+          echo "  listen = \":$${TELEGRAF_LISTENER_PORT}\""
+          echo "  metric_version = 2"
+          if [ -n "$${INFLUX_URL}" ]; then
+            echo "[[outputs.influxdb_v2]]"
+            echo "  urls = $$(toml_list "$${INFLUX_URL}")"
+            echo "  organization = $$(toml "$${INFLUX_ORG}")"
+            echo "  bucket = $$(toml "$${INFLUX_BUCKET}")"
+            if [ -n "$${INFLUX_TOKEN}" ]; then
+              echo '  token = "$${INFLUX_TOKEN}"'
+            fi
+          fi
+        } >"$${conf}"
+        exec /usr/bin/telegraf --config "$${conf}"

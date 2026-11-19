@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.1-openshift.1
+
+- The catalog names the vendor, Traefik Labs, instead of logiccloud, which only packages the app.
+- New license file `license.txt`: the upstream license text, MIT (Traefik).
+- No change to the chart or images.
+
 ## 1.2.0-openshift.1
 
 - Chart: traefik-restricted 0.3.0-openshift.1. The fixed `runAsUser` and `runAsGroup` (65532) are removed, because OpenShift's restricted SCC rejects them. OpenShift assigns these IDs from the namespace's UID range.

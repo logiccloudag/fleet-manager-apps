@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.1-openshift.1
+
+- The catalog names the vendor, OpenJS Foundation, instead of logiccloud, which only packages the app.
+- New license file `license.txt`: the upstream license text, Apache-2.0 (Node-RED).
+- No change to the chart or images.
+
 ## 1.2.0-openshift.1
 
 - The chart is now node-red-restricted 0.1.0-openshift.1, a wrapper around the unchanged schwarzit node-red chart 0.40.2 (`helm-node-red/chart`). It removes the chart's fixed `runAsUser`, `runAsGroup` and `fsGroup` (1000), which OpenShift's restricted SCC rejects. OpenShift assigns these IDs from the namespace's UID range. Every Helm parameter pointer now starts with `node-red.`.
