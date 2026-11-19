@@ -294,6 +294,10 @@ def replace_image_refs(app, name, old_tag, old_digest, new_tag, new_digest):
                 # A full reference, "<tag>@sha256:<hex>", a digest or a bare hex.
                 line = line.replace(f"{old_tag}@{old_digest}", f"{new_tag}@{new_digest}")
                 line = line.replace(old_hex, new_hex)
+            elif re.match(rf"^\s*image:\s*\S*/{re.escape(name)}:{re.escape(old_tag)}\s*$", line):
+                # A compose image is pinned by tag only (the FLECS agent
+                # rejects tag@digest); scripts/images.tsv keeps the digest.
+                line = line.replace(f"/{name}:{old_tag}", f"/{name}:{new_tag}")
             elif re.match(rf"^\s*tag:\s*\"?{re.escape(old_tag)}\"?\s*$", line):
                 line = line.replace(old_tag, new_tag)
             elif (re.match(rf"^\s*value:\s*\"{re.escape(old_tag)}\"\s*$", line)
