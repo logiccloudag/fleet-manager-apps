@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "telegraf.fullname" . }}
+  labels:
+    {{- include "telegraf.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "telegraf.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "telegraf.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # A fixed non-root UID: the image's own telegraf user is an Alpine
+      # system user without a fixed UID. Telegraf writes no file.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: telegraf
+          image: {{ include "telegraf.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          # Telegraf itself, without the image's entrypoint (it only drops
+          # root, which this pod never has).
+          command: ["/usr/bin/telegraf", "--config", "/etc/telegraf/telegraf.conf"]
+          {{- if or .Values.mqtt.existingSecret .Values.influxdb.existingSecret }}
+          env:
+            {{- with .Values.mqtt.existingSecret }}
+            - name: MQTT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.mqtt.usernameKey }}
+            - name: MQTT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.mqtt.passwordKey }}
+            {{- end }}
+            {{- with .Values.influxdb.existingSecret }}
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.influxdb.tokenKey }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ include "telegraf.port" . }}
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            periodSeconds: 20
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/telegraf
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "telegraf.fullname" . }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

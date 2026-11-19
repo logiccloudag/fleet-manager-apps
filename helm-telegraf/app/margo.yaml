@@ -1,0 +1,304 @@
+apiVersion: v1
+id: telegraf
+metadata:
+  name: Telegraf
+  version: "1.0.0"
+  description: >-
+    Telegraf 1.40 plugin-driven agent for collecting and forwarding metrics,
+    from the official telegraf image, installed from telegraf-restricted, a
+    small logiccloud chart. Runs under Pod Security "restricted" with
+    namespace-scoped resources only. Collects the host's CPU, memory and
+    system metrics, optionally consumes MQTT topics, serves everything for
+    Prometheus and optionally writes it to InfluxDB 2.
+    A compose profile runs the same image with Docker Compose.
+  catalog:
+    organization:
+      - name: InfluxData
+        site: https://www.influxdata.com
+    application:
+      tagline: Agent for collecting, processing and forwarding metrics and events.
+      icon: icon.png
+      licenseFile: license.txt
+      releaseNotes: release-notes.md
+      site: https://www.influxdata.com/time-series-platform/telegraf/
+      tags:
+        - metrics
+        - monitoring
+        - iot
+deploymentProfiles:
+  - type: helm
+    id: kubernetes
+    components:
+      - name: telegraf
+        properties:
+          # The chart in helm-telegraf/chart.
+          repository: oci://ghcr.io/logiccloudag/margo-charts/telegraf-restricted
+          revision: "0.1.0"
+          wait: true
+          timeout: "10m0s"
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.25
+          architectures:
+            - amd64
+            - arm64
+        memory: 256Mi
+        storage: 64Mi
+  - type: compose
+    id: compose
+    components:
+      - name: telegraf-compose
+        properties:
+          # The compose package built from helm-telegraf/compose
+          # (scripts/publish-compose.sh).
+          repository: oci://ghcr.io/logiccloudag/margo-compose/telegraf
+          revision: "1.0.0"
+          wait: true
+          timeout: "10m0s"
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 0.25
+          architectures:
+            - amd64
+            - arm64
+        memory: 256Mi
+        storage: 64Mi
+# Every parameter reaches the kubernetes-agent as a string and is set like
+# `helm --set-string` at the dot path in `pointer`. The chart reads every
+# value string-safely: "false" switches a boolean off, numbers may be strings.
+# A value that goes into telegraf.conf must not contain a double quote or a
+# backslash: the chart and the compose package refuse it.
+# The Pod Security settings (UID 10001, seccomp RuntimeDefault, no privilege
+# escalation, all capabilities dropped, read-only root file system) are fixed
+# in the chart and are not parameters.
+# A target of a *-compose component names an environment variable of
+# compose/compose.yaml instead (Margo Target.pointer for compose); its
+# default there equals the value here. Parameters without such a target
+# (for example the Secrets and the resources) apply to the Helm profile
+# only.
+parameters:
+  # Telegraf durations, for example 10s or 1m.
+  interval:
+    value: "10s"
+    targets:
+      - pointer: agent.interval
+        components: [telegraf]
+      - pointer: TELEGRAF_INTERVAL
+        components: [telegraf-compose]
+  flushInterval:
+    value: "10s"
+    targets:
+      - pointer: agent.flushInterval
+        components: [telegraf]
+      - pointer: TELEGRAF_FLUSH_INTERVAL
+        components: [telegraf-compose]
+  # "true": CPU, memory and system metrics of the host.
+  systemMetrics:
+    value: "true"
+    targets:
+      - pointer: systemMetrics
+        components: [telegraf]
+      - pointer: TELEGRAF_SYSTEM_METRICS
+        components: [telegraf-compose]
+  # Port of the Prometheus endpoint inside the pod (1024 to 65535).
+  prometheusPort:
+    value: "9273"
+    targets:
+      - pointer: prometheus.port
+        components: [telegraf]
+      - pointer: TELEGRAF_LISTENER_PORT
+        components: [telegraf-compose]
+  servicePort:
+    value: "9273"
+    targets:
+      - pointer: service.port
+        components: [telegraf]
+      - pointer: TELEGRAF_PORT
+        components: [telegraf-compose]
+  # ClusterIP, NodePort or LoadBalancer.
+  serviceType:
+    value: "ClusterIP"
+    targets:
+      - pointer: service.type
+        components: [telegraf]
+  # Comma separated broker URLs, for example tcp://mosquitto:1883. Empty:
+  # no MQTT input.
+  mqttServers:
+    value: ""
+    targets:
+      - pointer: mqtt.servers
+        components: [telegraf]
+      - pointer: MQTT_SERVERS
+        components: [telegraf-compose]
+  # Comma separated topics.
+  mqttTopics:
+    value: "telegraf/#"
+    targets:
+      - pointer: mqtt.topics
+        components: [telegraf]
+      - pointer: MQTT_TOPICS
+        components: [telegraf-compose]
+  # Telegraf input data format: influx, json, value, ...
+  mqttDataFormat:
+    value: "influx"
+    targets:
+      - pointer: mqtt.dataFormat
+        components: [telegraf]
+      - pointer: MQTT_DATA_FORMAT
+        components: [telegraf-compose]
+  # Name of an existing Secret in the agent's namespace with the keys
+  # username and password. Empty: no credentials.
+  mqttExistingSecret:
+    value: ""
+    targets:
+      - pointer: mqtt.existingSecret
+        components: [telegraf]
+  # Compose profile only: the broker credentials (a compose package carries
+  # no Secret).
+  mqttUsername:
+    value: ""
+    targets:
+      - pointer: MQTT_USERNAME
+        components: [telegraf-compose]
+  mqttPassword:
+    value: ""
+    targets:
+      - pointer: MQTT_PASSWORD
+        components: [telegraf-compose]
+  # InfluxDB 2 URL, for example http://influxdb-influxdb2:8086. Empty: no
+  # InfluxDB output.
+  influxdbUrl:
+    value: ""
+    targets:
+      - pointer: influxdb.url
+        components: [telegraf]
+      - pointer: INFLUX_URL
+        components: [telegraf-compose]
+  influxdbOrganization:
+    value: ""
+    targets:
+      - pointer: influxdb.organization
+        components: [telegraf]
+      - pointer: INFLUX_ORG
+        components: [telegraf-compose]
+  influxdbBucket:
+    value: ""
+    targets:
+      - pointer: influxdb.bucket
+        components: [telegraf]
+      - pointer: INFLUX_BUCKET
+        components: [telegraf-compose]
+  # Name of an existing Secret in the agent's namespace with the key token
+  # (an InfluxDB API token). Empty: no token.
+  influxdbExistingSecret:
+    value: ""
+    targets:
+      - pointer: influxdb.existingSecret
+        components: [telegraf]
+  # Compose profile only: the InfluxDB API token.
+  influxdbToken:
+    value: ""
+    targets:
+      - pointer: INFLUX_TOKEN
+        components: [telegraf-compose]
+  cpuRequest:
+    value: "50m"
+    targets:
+      - pointer: resources.requests.cpu
+        components: [telegraf]
+  memoryRequest:
+    value: "64Mi"
+    targets:
+      - pointer: resources.requests.memory
+        components: [telegraf]
+  memoryLimit:
+    value: "256Mi"
+    targets:
+      - pointer: resources.limits.memory
+        components: [telegraf]
+configuration:
+  sections:
+    - name: Collection
+      settings:
+        - parameter: interval
+          name: Collection interval
+          schema: text
+        - parameter: flushInterval
+          name: Flush interval
+          schema: text
+        - parameter: systemMetrics
+          name: Host CPU, memory and system metrics (true or false)
+          schema: text
+    - name: Prometheus endpoint
+      settings:
+        - parameter: prometheusPort
+          name: Prometheus port
+          schema: port
+        - parameter: servicePort
+          name: Service port
+          schema: port
+        - parameter: serviceType
+          name: Service type (ClusterIP, NodePort or LoadBalancer)
+          schema: text
+    - name: MQTT input
+      settings:
+        - parameter: mqttServers
+          name: Broker URLs (comma separated, empty for none)
+          schema: optionalText
+        - parameter: mqttTopics
+          name: Topics (comma separated)
+          schema: text
+        - parameter: mqttDataFormat
+          name: Data format
+          schema: text
+        - parameter: mqttExistingSecret
+          name: Secret with username and password (Kubernetes)
+          schema: optionalText
+        - parameter: mqttUsername
+          name: User name (compose)
+          schema: optionalText
+        - parameter: mqttPassword
+          name: Password (compose)
+          schema: optionalText
+    - name: InfluxDB output
+      settings:
+        - parameter: influxdbUrl
+          name: InfluxDB URL (empty for none)
+          schema: optionalText
+        - parameter: influxdbOrganization
+          name: Organization
+          schema: optionalText
+        - parameter: influxdbBucket
+          name: Bucket
+          schema: optionalText
+        - parameter: influxdbExistingSecret
+          name: Secret with the API token (Kubernetes)
+          schema: optionalText
+        - parameter: influxdbToken
+          name: API token (compose)
+          schema: optionalText
+    - name: Resources
+      settings:
+        - parameter: cpuRequest
+          name: CPU request
+          schema: quantity
+        - parameter: memoryRequest
+          name: Memory request
+          schema: quantity
+        - parameter: memoryLimit
+          name: Memory limit
+          schema: quantity
+  schema:
+    - name: text
+      dataType: string
+    # Empty is a valid value (Margo allowEmpty, PR #212): without it
+    # fleet-manager marks a setting with an empty default as required.
+    - name: optionalText
+      dataType: string
+      allowEmpty: true
+    - name: port
+      dataType: string
+    - name: quantity
+      dataType: string

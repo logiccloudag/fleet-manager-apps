@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "telegraf.fullname" . }}
+  labels:
+    {{- include "telegraf.labels" . | nindent 4 }}
+data:
+  telegraf.conf: |
+    [agent]
+      interval = {{ include "telegraf.toml" .Values.agent.interval }}
+      flush_interval = {{ include "telegraf.toml" .Values.agent.flushInterval }}
+      omit_hostname = false
+
+    [[inputs.internal]]
+    {{- if include "telegraf.isTrue" .Values.systemMetrics }}
+
+    [[inputs.cpu]]
+      percpu = false
+      totalcpu = true
+
+    [[inputs.mem]]
+
+    [[inputs.system]]
+    {{- end }}
+    {{- if trim (toString .Values.mqtt.servers) }}
+
+    [[inputs.mqtt_consumer]]
+      servers = {{ include "telegraf.tomlList" .Values.mqtt.servers }}
+      topics = {{ include "telegraf.tomlList" .Values.mqtt.topics }}
+      data_format = {{ include "telegraf.toml" .Values.mqtt.dataFormat }}
+      {{- if .Values.mqtt.existingSecret }}
+      username = "${MQTT_USERNAME}"
+      password = "${MQTT_PASSWORD}"
+      {{- end }}
+    {{- end }}
+
+    [[outputs.prometheus_client]]
+      listen = ":{{ include "telegraf.port" . }}"
+      metric_version = 2
+    {{- if trim (toString .Values.influxdb.url) }}
+
+    [[outputs.influxdb_v2]]
+      urls = {{ include "telegraf.tomlList" .Values.influxdb.url }}
+      organization = {{ include "telegraf.toml" .Values.influxdb.organization }}
+      bucket = {{ include "telegraf.toml" .Values.influxdb.bucket }}
+      {{- if .Values.influxdb.existingSecret }}
+      token = "${INFLUX_TOKEN}"
+      {{- end }}
+    {{- end }}
+    {{- with .Values.extraConfig }}
+
+    {{- . | nindent 4 }}
+    {{- end }}

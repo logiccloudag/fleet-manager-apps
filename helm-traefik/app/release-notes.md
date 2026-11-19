@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.3
+
+- The catalog names the vendor, Traefik Labs, instead of logiccloud, which only packages the app.
+- New license file `license.txt`: the upstream license text, MIT (Traefik).
+- No change to the chart or images.
+
 ## 1.2.2
 
 - Image: `ghcr.io/logiccloudag/margo-images/traefik:v3.7.19`, a copy of `docker.io/library/traefik:v3.7.19` (v3.7.17 before).

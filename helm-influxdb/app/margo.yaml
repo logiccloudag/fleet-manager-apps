@@ -2,7 +2,7 @@ apiVersion: v1
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.2.0"
+  version: "1.2.1"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
@@ -11,11 +11,12 @@ metadata:
     A compose profile runs the same image with Docker Compose.
   catalog:
     organization:
-      - name: logiccloud
-        site: https://logiccloud.io
+      - name: InfluxData
+        site: https://www.influxdata.com
     application:
       tagline: Time series database for metrics, events and sensor data.
       icon: icon.png
+      licenseFile: license.txt
       releaseNotes: release-notes.md
       site: https://www.influxdata.com/products/influxdb/
       tags:

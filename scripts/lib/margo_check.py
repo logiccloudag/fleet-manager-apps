@@ -398,7 +398,7 @@ def cmd_fleet_manager(margo_path, app_dir, chart, version, registry, compose_reg
     if not md.get("description"):
         fail("metadata.description is recommended by fleet-manager (warning) and required here")
     application = ((md.get("catalog") or {}).get("application")) or {}
-    for field in ("icon", "releaseNotes"):
+    for field in ("icon", "releaseNotes", "licenseFile"):
         rel = application.get(field)
         if not rel:
             fail(f"metadata.catalog.application.{field} is required here")

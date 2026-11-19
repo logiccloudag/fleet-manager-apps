@@ -2,7 +2,7 @@ apiVersion: v1
 id: node-red
 metadata:
   name: Node-RED
-  version: "1.2.0"
+  version: "1.2.1"
   description: >-
     Node-RED 4 low-code flow editor for wiring devices, APIs and services,
     installed from the upstream schwarzit Helm chart. Runs under Pod Security
@@ -10,11 +10,12 @@ metadata:
     A compose profile runs the same image with Docker Compose.
   catalog:
     organization:
-      - name: logiccloud
-        site: https://logiccloud.io
+      - name: OpenJS Foundation
+        site: https://openjsf.org
     application:
       tagline: Low-code, flow-based programming for event-driven applications.
       icon: icon.png
+      licenseFile: license.txt
       releaseNotes: release-notes.md
       site: https://nodered.org
       tags:
