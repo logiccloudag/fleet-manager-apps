@@ -20,7 +20,28 @@ data:
 
     [[inputs.mem]]
 
+    [[inputs.swap]]
+
     [[inputs.system]]
+
+    [[inputs.kernel]]
+
+    [[inputs.processes]]
+
+    [[inputs.disk]]
+      ignore_fs = ["tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs", "nsfs"]
+
+    [[inputs.diskio]]
+    {{- end }}
+    {{- if include "telegraf.isTrue" .Values.networkMetrics }}
+
+    [[inputs.net]]
+
+    [[inputs.netstat]]
+    {{- end }}
+    {{- if include "telegraf.isTrue" .Values.temperatureMetrics }}
+
+    [[inputs.temp]]
     {{- end }}
     {{- if trim (toString .Values.mqtt.servers) }}
 

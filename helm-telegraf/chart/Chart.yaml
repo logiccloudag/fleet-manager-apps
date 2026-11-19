@@ -3,13 +3,14 @@ name: telegraf-restricted
 description: >-
   Telegraf metrics agent for the kubernetes-agent: the official telegraf
   image (pinned by digest) under Pod Security "restricted", with namespaced
-  kinds only (ConfigMap, Service, Deployment). It collects the agent's own
-  and the host's CPU, memory and system metrics, optionally consumes MQTT
-  topics, exposes everything for Prometheus and optionally writes to
+  kinds only (ConfigMap, Service, Deployment). It collects Telegraf's own
+  and the node's CPU, memory, disk I/O and kernel metrics, the pod's disk,
+  network and process metrics and optionally temperatures, consumes MQTT
+  topics if set, exposes everything for Prometheus and optionally writes to
   InfluxDB 2. Every value is read string-safely, because the agent sets
   Margo parameters as strings.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "1.40.3"
 kubeVersion: ">=1.21.0-0"
 home: https://github.com/logiccloudag/fleet-manager-apps

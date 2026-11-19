@@ -16,4 +16,4 @@ helm-influxdb	influxdb2-restricted	0.2.0	wrapper	helm-influxdb/chart	1da8b1e8a2b
 helm-mosquitto	mosquitto-restricted	0.2.0	local	helm-mosquitto/chart	-
 helm-node-red	node-red	0.40.2	mirror	oci://ghcr.io/schwarzit/charts/node-red	503b99d1cf5c0599c990f28ab63ed660d8389159f5d24f7bbaaf3ed150a016e2
 helm-traefik	traefik-restricted	0.2.3	local	helm-traefik/chart	-
-helm-telegraf	telegraf-restricted	0.1.0	local	helm-telegraf/chart	-
+helm-telegraf	telegraf-restricted	0.2.0	local	helm-telegraf/chart	-
