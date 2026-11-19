@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: influxdb
 metadata:
   name: InfluxDB 2
-  version: "1.2.1-openshift.1"
+  version: "1.2.2-openshift.1"
   description: >-
     InfluxDB 2.9 time series database with its web UI and HTTP API on one
     port. Installed from influxdb2-restricted, a thin logiccloud wrapper
@@ -52,7 +52,7 @@ deploymentProfiles:
           # The compose package built from helm-influxdb/compose
           # (scripts/publish-compose.sh).
           repository: oci://ghcr.io/logiccloudag/margo-compose/influxdb
-          revision: "1.0.0"
+          revision: "1.0.1"
           wait: true
           timeout: "10m0s"
     requiredResources:

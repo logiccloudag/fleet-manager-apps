@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.3.2-openshift.1
+
+- Compose package 1.1.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/grafana:13.2.4-distroless`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.
+
 ## 1.3.1-openshift.1
 
 - The catalog names the vendor, Grafana Labs, instead of logiccloud, which only packages the app.

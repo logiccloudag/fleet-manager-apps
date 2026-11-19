@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.0.1-openshift.1
+
+- Compose package 1.0.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/telegraf:1.40.3-alpine`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.
+
 ## 1.0.0-openshift.1
 
 - Initial release. Telegraf 1.40.3 from the official image `docker.io/library/telegraf:1.40.3-alpine` (MIT), copied to `ghcr.io/logiccloudag/margo-images/telegraf:1.40.3-alpine` with the same multi-arch digest and pulled by digest.
