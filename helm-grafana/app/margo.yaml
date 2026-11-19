@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: grafana
 metadata:
   name: Grafana
-  version: "1.3.3"
+  version: "1.4.0"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
@@ -53,7 +53,7 @@ deploymentProfiles:
           # The compose package built from helm-grafana/compose
           # (scripts/publish-compose.sh).
           repository: oci://ghcr.io/logiccloudag/margo-compose/grafana
-          revision: "1.1.1"
+          revision: "1.2.0"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -170,6 +170,18 @@ parameters:
     targets:
       - pointer: grafana.admin.existingSecret
         components: [grafana]
+  # [public_dashboards] enabled in grafana.ini, set through Grafana's
+  # environment override GF_PUBLIC_DASHBOARDS_ENABLED (the chart key
+  # grafana.ini contains a dot, which a parameter pointer cannot address).
+  # "true" (Grafana's default): dashboards can be shared through a public
+  # link without login. "false": no public links; existing ones stop working.
+  publicDashboards:
+    value: "true"
+    targets:
+      - pointer: grafana.env.GF_PUBLIC_DASHBOARDS_ENABLED
+        components: [grafana]
+      - pointer: GF_PUBLIC_DASHBOARDS_ENABLED
+        components: [grafana-compose]
   cpuRequest:
     value: "100m"
     targets:
@@ -198,6 +210,11 @@ configuration:
         - parameter: adminExistingSecret
           name: Existing Secret with admin-user and admin-password (Kubernetes)
           schema: optionalText
+    - name: Sharing
+      settings:
+        - parameter: publicDashboards
+          name: Public dashboards (shared by link, without login)
+          schema: switch
     - name: Service and storage
       settings:
         - parameter: servicePort
@@ -228,5 +245,8 @@ configuration:
       allowEmpty: true
     - name: port
       dataType: string
+    - name: switch
+      dataType: string
+      options: ["true", "false"]
     - name: quantity
       dataType: string

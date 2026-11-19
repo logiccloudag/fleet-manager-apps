@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.4.0
+
+- New setting `publicDashboards` (section Sharing): `[public_dashboards] enabled` in `grafana.ini`, set through Grafana's environment override `GF_PUBLIC_DASHBOARDS_ENABLED`. `true` (the default, as in Grafana) allows sharing a dashboard through a public link without login; `false` switches public dashboards off, and existing public links stop working.
+- Compose package 1.2.0. The chart is unchanged.
+
 ## 1.3.3
 
 - Versions no longer carry the `-openshift.<n>` suffix: the app is 1.3.3 and the chart grafana-restricted 0.1.0. The chart is unchanged apart from its version.
