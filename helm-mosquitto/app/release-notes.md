@@ -1,5 +1,9 @@
 # Release Notes
 
+## 2.2.2
+
+- Compose package 1.0.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/eclipse-mosquitto:2.1.2-alpine`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.
+
 ## 2.2.1
 
 - The catalog names the vendor, Eclipse Foundation, instead of logiccloud, which only packages the app.

@@ -2,7 +2,7 @@ apiVersion: v1
 id: telegraf
 metadata:
   name: Telegraf
-  version: "1.0.0"
+  version: "1.0.1"
   description: >-
     Telegraf 1.40 plugin-driven agent for collecting and forwarding metrics,
     from the official telegraf image, installed from telegraf-restricted, a
@@ -53,7 +53,7 @@ deploymentProfiles:
           # The compose package built from helm-telegraf/compose
           # (scripts/publish-compose.sh).
           repository: oci://ghcr.io/logiccloudag/margo-compose/telegraf
-          revision: "1.0.0"
+          revision: "1.0.1"
           wait: true
           timeout: "10m0s"
     deviceConstraints:

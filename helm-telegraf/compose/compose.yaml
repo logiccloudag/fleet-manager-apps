@@ -15,7 +15,7 @@
 # (${VAR} in telegraf.conf), so they are not written to the file.
 services:
   telegraf:
-    image: ghcr.io/logiccloudag/margo-images/telegraf:1.40.3-alpine@sha256:10fe8c974752c8088858f012cb47b71f5bb67c5695829be56d87dfbf8e0092b8
+    image: ghcr.io/logiccloudag/margo-images/telegraf:1.40.3-alpine
     restart: unless-stopped
     # A non-root UID, a read-only root file system and no capability, like
     # the Helm profile. The Prometheus port must be 1024 or higher.
