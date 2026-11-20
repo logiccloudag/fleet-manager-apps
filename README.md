@@ -21,11 +21,15 @@ GitHub Actions (see "Publishing"). The design is ADR FM-A-202.
 This branch is for OpenShift only. OpenShift's restricted SCC assigns each
 pod a UID, a GID and an fsGroup from the namespace's range, and rejects a pod
 that sets fixed IDs. No chart on this branch sets `runAsUser`, `runAsGroup`
-or `fsGroup`; `runAsNonRoot`, seccomp `RuntimeDefault`, no privilege
+or `fsGroup` on OpenShift; `runAsNonRoot`, seccomp `RuntimeDefault`, no privilege
 escalation and dropped capabilities stay.
 
-- Mosquitto, Traefik and InfluxDB: the IDs are removed from the chart.
+- Mosquitto and InfluxDB: the IDs are removed from the chart.
   Telegraf's chart never sets them.
+- Traefik: the chart checks for the API group `security.openshift.io/v1`.
+  On OpenShift it sets no IDs; on any other cluster it sets `runAsUser` and
+  `runAsGroup` 65532, because the official image runs as root. The value
+  `openshift` (`auto`, `true`, `false`) overrides the detection.
 - Grafana and Node-RED: their upstream charts fix the IDs, and a Margo
   parameter cannot remove a typed value. Each is therefore a wrapper chart
   (`helm-<app>/chart`) that sets the IDs to `null` and passes everything else
@@ -43,8 +47,9 @@ escalation and dropped capabilities stay.
   Compose packages have no OpenShift-specific content, so both branches
   publish the same package under the same version.
 - On other Kubernetes distributions the InfluxDB, Mosquitto, Node-RED and
-  Traefik pods fail `runAsNonRoot`: their images do not declare a numeric
-  non-root user. Use the `main` catalog there.
+  Telegraf pods fail `runAsNonRoot`: their images do not declare a numeric
+  non-root user. Use the `main` catalog there. Traefik detects OpenShift and
+  sets UID 65532 elsewhere (see below).
 
 ## Layout
 
@@ -97,7 +102,7 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | `influxdb` | `influxdb2-restricted` 0.5.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
 | `mosquitto` | `mosquitto-restricted` 0.3.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red-restricted` 0.1.0 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 (a dependency) | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | wrapper |
-| `traefik` | `traefik-restricted` 0.3.0 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
+| `traefik` | `traefik-restricted` 0.3.1 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
 | `telegraf` | `telegraf-restricted` 0.3.0 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
 
 `grafana`, `influxdb`, `mosquitto`, `node-red` and `telegraf` also have a
