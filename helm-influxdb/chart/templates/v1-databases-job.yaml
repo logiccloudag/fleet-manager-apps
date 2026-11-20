@@ -57,9 +57,10 @@ spec:
                 secretKeyRef:
                   name: {{ $influx.adminUser.existingSecret | default (printf "%s-auth" $fullname) }}
                   key: admin-token
-          {{- with $influx.securityContext }}
+          {{- /* restricted.securityContext: patches/0001-openshift-ids.patch */}}
+          {{- with include "restricted.securityContext" (list . $influx.securityContext $influx.securityContextOutsideOpenShift) }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
+            {{- . | nindent 12 }}
           {{- end }}
           resources:
             requests:

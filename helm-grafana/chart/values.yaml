@@ -1,5 +1,6 @@
 # Values of the wrapper chart grafana-restricted. Everything below is passed
-# to the unchanged upstream subchart grafana-community/grafana 13.7.0.
+# to the upstream subchart grafana-community/grafana 13.7.0, which
+# patches/0001-openshift-ids.patch changes only in its pod security context.
 #
 # The upstream chart fixes the pod's runAsUser, runAsGroup and fsGroup to
 # 472. OpenShift's restricted SCC assigns these IDs from the namespace's UID
@@ -7,9 +8,25 @@
 # parameter cannot do this: the agent sets every parameter as a string.
 # runAsNonRoot stays true; the image's own user is 472 and OpenShift runs the
 # pod as a non-root UID of the namespace's range.
+#
+# OpenShift detection (patches/0001-openshift-ids.patch): "auto" (default)
+# checks for the API group security.openshift.io/v1. On OpenShift the
+# security contexts below are used as they are (the restricted SCC assigns
+# the IDs and rejects fixed ones); on any other cluster the keys of
+# *OutsideOpenShift are added, because nothing else assigns a non-root UID.
+# "true" or "false" skips the detection.
+global:
+  openshift: auto
+
 grafana:
   securityContext:
     runAsNonRoot: true
     runAsUser: null
     runAsGroup: null
     fsGroup: null
+  # Added outside OpenShift: the upstream IDs, so the volume belongs to the
+  # grafana user (fsGroup) on any storage class.
+  securityContextOutsideOpenShift:
+    runAsUser: 472
+    runAsGroup: 472
+    fsGroup: 472

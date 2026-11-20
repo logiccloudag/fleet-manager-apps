@@ -1,0 +1,55 @@
+Added by fleet-manager-apps: OpenShift-aware IDs for the grafana subchart.
+scripts/lib/charts.sh applies this patch to the downloaded upstream chart
+(checked against its pinned sha256) before packaging. On OpenShift the
+security contexts are unchanged; on any other cluster the keys of
+*OutsideOpenShift in values.yaml are added.
+
+diff -ruN a/grafana/templates/_pod.tpl b/grafana/templates/_pod.tpl
+--- a/grafana/templates/_pod.tpl
++++ b/grafana/templates/_pod.tpl
+@@ -10,9 +10,9 @@
+ {{- if kindIs "bool" .Values.hostUsers }}
+ hostUsers: {{ .Values.hostUsers }}
+ {{- end }}
+-{{- with .Values.securityContext }}
++{{- with include "restricted.securityContext" (list . .Values.securityContext .Values.securityContextOutsideOpenShift) }}
+ securityContext:
+-  {{- toYaml . | nindent 2 }}
++  {{- . | nindent 2 }}
+ {{- end }}
+ {{- with .Values.hostAliases }}
+ hostAliases:
+diff -ruN a/grafana/templates/_restricted.tpl b/grafana/templates/_restricted.tpl
+--- a/grafana/templates/_restricted.tpl
++++ b/grafana/templates/_restricted.tpl
+@@ -0,0 +1,30 @@
++{{/*
++Added by fleet-manager-apps (patches/0001-openshift-ids.patch), not upstream.
++
++restricted.securityContext (list <context> <securityContext> <outside OpenShift>)
++renders <securityContext>, plus every key of <outside OpenShift> it does not
++set when the cluster is not OpenShift. OpenShift's restricted SCC assigns
++runAsUser, runAsGroup and fsGroup from the namespace's UID range and rejects
++fixed IDs; any other cluster assigns none, and an image without a numeric
++non-root USER then fails runAsNonRoot. OpenShift is detected by the API group
++security.openshift.io/v1; global.openshift ("auto", "true", "false")
++overrides the detection.
++*/}}
++{{- define "restricted.securityContext" -}}
++{{- $ctx := index . 0 -}}
++{{- $sc := deepCopy ((index . 1) | default dict) -}}
++{{- $mode := toString ((($ctx.Values.global | default dict).openshift) | default "auto") | lower -}}
++{{- if not (has $mode (list "auto" "true" "false")) -}}
++{{- fail (printf "global.openshift must be auto, true or false, not %q" $mode) -}}
++{{- end -}}
++{{- $openshift := eq $mode "true" -}}
++{{- if eq $mode "auto" -}}
++{{- $openshift = $ctx.Capabilities.APIVersions.Has "security.openshift.io/v1" -}}
++{{- end -}}
++{{- if not $openshift -}}
++{{- $sc = merge $sc (deepCopy ((index . 2) | default dict)) -}}
++{{- end -}}
++{{- if $sc -}}
++{{- toYaml $sc -}}
++{{- end -}}
++{{- end -}}

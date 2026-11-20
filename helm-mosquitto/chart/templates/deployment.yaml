@@ -21,15 +21,8 @@ spec:
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
-      # No runAsUser, runAsGroup or fsGroup: OpenShift's restricted SCC
-      # assigns them from the namespace's UID range and rejects fixed IDs.
       securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-        {{- with .Values.podSecurityContext }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        {{- include "mosquitto.podSecurityContext" . | nindent 8 }}
       {{- if .Values.auth.existingSecret }}
       # mosquitto 2.1 cannot open a Secret volume's symlinked key and warns
       # that it will refuse a password file it does not own. The init

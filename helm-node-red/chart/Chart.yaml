@@ -8,7 +8,7 @@ description: >-
   parameters reach the agent as strings only, so these values cannot be
   removed through parameters.
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "4.1.2"
 home: https://github.com/logiccloudag/fleet-manager-apps
 sources:

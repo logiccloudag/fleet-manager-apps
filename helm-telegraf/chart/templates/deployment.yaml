@@ -18,16 +18,8 @@ spec:
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
-      # No runAsUser, runAsGroup or fsGroup: OpenShift's restricted SCC
-      # assigns them from the namespace's UID range and rejects fixed IDs.
-      # Telegraf writes no file.
       securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-        {{- with .Values.podSecurityContext }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        {{- include "telegraf.podSecurityContext" . | nindent 8 }}
       containers:
         - name: telegraf
           image: {{ include "telegraf.image" . | quote }}

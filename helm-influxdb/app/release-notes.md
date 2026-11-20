@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.3.1
+
+- Chart: influxdb2-restricted 0.5.1. Fix: on a Kubernetes cluster without OpenShift the pod failed `runAsNonRoot` (`CreateContainerConfigError: container has runAsNonRoot and image will run as root`), because nothing assigned a non-root UID. The chart now checks for the API group `security.openshift.io/v1`: on OpenShift it still sets no fixed IDs (the restricted SCC assigns them); on any other cluster it uses UID and GID 1000 (with fsGroup 1000). The chart value `global.openshift` (`auto`, `true`, `false`) overrides the detection. The upstream chart is patched for this (`chart/patches/0001-openshift-ids.patch`); packaging applies the patch to the pinned, digest-checked upstream chart.
+
 ## 1.3.0
 
 - New setting `v1Databases` (section InfluxQL): InfluxDB 1.x (v1) databases mapped to buckets (DBRP mappings), for InfluxQL clients such as a Grafana data source with query language InfluxQL, and dashboards written in InfluxQL, that expect a database name other than the bucket's. InfluxDB already maps every bucket to the database of the same name (virtual mappings), so the bucket `telegraf` is the database `telegraf` without an entry. Comma separated entries `bucket:database`, for example `default:telegraf`; empty by default. A missing bucket is created with the initial bucket's retention.
