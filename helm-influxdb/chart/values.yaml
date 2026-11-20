@@ -1,5 +1,6 @@
 # Values of the wrapper chart influxdb2-restricted. Everything below is
-# passed to the unchanged upstream subchart influxdata/influxdb2 2.1.2.
+# passed to the upstream subchart influxdata/influxdb2 2.1.2, which
+# patches/0001-openshift-ids.patch changes only in its security contexts.
 #
 # The kubernetes-agent sets every Margo parameter as a string (like
 # `helm --set-string`). The typed values that make the pod pass Pod Security
@@ -17,8 +18,18 @@
 v1Databases: ""
 
 # Pod security context of that Job (the InfluxDB container's settings
-# below apply to its container as well; no fixed IDs on OpenShift).
+# below apply to its container as well, including the IDs outside OpenShift).
 podSecurityContext: {}
+
+# OpenShift detection (patches/0001-openshift-ids.patch): "auto" (default)
+# checks for the API group security.openshift.io/v1. On OpenShift the
+# security contexts below are used as they are (the restricted SCC assigns
+# the IDs and rejects fixed ones); on any other cluster the keys of
+# *OutsideOpenShift are added, because nothing else assigns a non-root UID.
+# "true" or "false" skips the detection.
+global:
+  openshift: auto
+
 influxdb2:
   image:
     # The copy of docker.io/library/influxdb in the catalog's image registry
@@ -28,10 +39,9 @@ influxdb2:
     # The upstream chart pins 2.7.4 (2023-12); 2.9.1 is the current 2.x release.
     tag: 2.9.1-alpine@sha256:f551adeb94b6f97626d2043ec90ed17f81de18d15bb5412d2101e0965c93c797
   # Container security context: Pod Security "restricted". The upstream
-  # chart renders this map with toYaml and derives the pod's fsGroup from
-  # runAsGroup. No runAsUser or runAsGroup (so no fsGroup either):
-  # OpenShift's restricted SCC assigns them from the namespace's UID range
-  # and rejects fixed IDs.
+  # chart derives the pod's fsGroup from runAsGroup. No runAsUser or
+  # runAsGroup here: OpenShift's restricted SCC assigns them from the
+  # namespace's UID range and rejects fixed IDs.
   securityContext:
     runAsNonRoot: true
     allowPrivilegeEscalation: false
@@ -40,6 +50,11 @@ influxdb2:
         - ALL
     seccompProfile:
       type: RuntimeDefault
+  # Added to securityContext outside OpenShift: the influxdb user of the
+  # image (the official image starts as root), and fsGroup 1000 for the volume.
+  securityContextOutsideOpenShift:
+    runAsUser: 1000
+    runAsGroup: 1000
   # The agent's Role cannot create PodDisruptionBudgets (KA-A-20).
   pdb:
     create: false

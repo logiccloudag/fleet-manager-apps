@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.1.1
+
+- Chart: telegraf-restricted 0.3.1. Fix: on a Kubernetes cluster without OpenShift the pod failed `runAsNonRoot` (`CreateContainerConfigError: container has runAsNonRoot and image will run as root`), because nothing assigned a non-root UID. The chart now checks for the API group `security.openshift.io/v1`: on OpenShift it still sets no fixed IDs (the restricted SCC assigns them); on any other cluster it uses UID and GID 10001. The chart value `openshift` (`auto`, `true`, `false`) overrides the detection.
+
 ## 1.1.0
 
 - More host metrics, as in the usual Raspberry Pi monitoring setup with InfluxDB and Grafana. `systemMetrics` now also collects swap, kernel, process, disk and disk I/O metrics. The new `networkMetrics` (on by default) collects network interface and connection metrics. The new `temperatureMetrics` (off by default) reads the temperature sensors, for example the SoC.

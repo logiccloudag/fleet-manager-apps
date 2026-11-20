@@ -72,6 +72,26 @@ verify_sha() {
   [ "$actual" = "$2" ] || die "$(basename "$1"): sha256 $actual does not match the pin $2 in scripts/charts.tsv"
 }
 
+# apply_patches <chart> <chart-dir>: a wrapper may carry patches/*.patch
+# (unified diffs relative to its charts/ directory, paths a/<dep>/... and
+# b/<dep>/...). They change the verified upstream dependency: the archive is
+# unpacked in charts/, each patch is applied in name order without fuzz, and
+# patches/ is removed so it is not packaged. A patch that does not apply
+# exactly (for example after an upstream version bump) is an error.
+apply_patches() {
+  local chart="$1" dir="$2" dep p
+  [ -d "$dir/patches" ] || return 0
+  dep="$(find "$dir/charts" -name '*.tgz')"
+  tar -xzf "$dep" -C "$dir/charts" || die "$chart: cannot unpack $(basename "$dep")"
+  rm -f "$dep"
+  for p in "$dir"/patches/*.patch; do
+    [ -f "$p" ] || continue
+    patch --batch --forward --fuzz=0 --no-backup-if-mismatch -s -p1 -d "$dir/charts" <"$p" ||
+      die "$chart: patch $(basename "$p") does not apply to the upstream dependency"
+  done
+  rm -rf "$dir/patches"
+}
+
 # fetch_upstream <chart> <version> <type> <source> <sha256> <out-dir>:
 # writes <out-dir>/<chart>-<version>.tgz from the upstream source and prints
 # its path. A mirror chart is the upstream archive itself, checked against
@@ -120,6 +140,7 @@ REPOS
       deps="$(find "$tmp/src/charts" -name '*.tgz' | wc -l | tr -d ' ')"
       [ "$deps" = 1 ] || die "$chart: expected exactly one dependency archive, found $deps"
       verify_sha "$(find "$tmp/src/charts" -name '*.tgz')" "$sha"
+      apply_patches "$chart" "$tmp/src"
       helm package "$tmp/src" -d "$tmp" >/dev/null || die "$chart: helm package of $source failed"
       tgz="$tmp/$chart-$version.tgz"
       [ -f "$tgz" ] || die "$chart: the chart in $source is not $chart $version (check Chart.yaml against scripts/charts.tsv)"

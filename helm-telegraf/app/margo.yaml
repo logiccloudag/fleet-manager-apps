@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: telegraf
 metadata:
   name: Telegraf
-  version: "1.1.0"
+  version: "1.1.1"
   description: >-
     Telegraf 1.40 plugin-driven agent for collecting and forwarding metrics,
     from the official telegraf image, installed from telegraf-restricted, a
@@ -36,7 +36,7 @@ deploymentProfiles:
         properties:
           # The chart in helm-telegraf/chart.
           repository: oci://ghcr.io/logiccloudag/margo-charts/telegraf-restricted
-          revision: "0.3.0"
+          revision: "0.3.1"
           wait: true
           timeout: "10m0s"
     requiredResources:
@@ -73,8 +73,8 @@ deploymentProfiles:
 # backslash: the chart and the compose package refuse it.
 # The Pod Security settings (non-root, seccomp RuntimeDefault, no privilege
 # escalation, all capabilities dropped, read-only root file system) are fixed
-# in the chart and are not parameters. The chart sets no UID or GID:
-# OpenShift assigns them.
+# in the chart and are not parameters. UID and GID: assigned by OpenShift,
+# 10001 on other clusters.
 # A target of a *-compose component names an environment variable of
 # compose/compose.yaml instead (Margo Target.pointer for compose); its
 # default there equals the value here. Parameters without such a target

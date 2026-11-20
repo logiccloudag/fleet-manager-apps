@@ -1,5 +1,6 @@
 # Values of the wrapper chart node-red-restricted. Everything below is passed
-# to the unchanged upstream subchart schwarzit/node-red 0.40.2.
+# to the upstream subchart schwarzit/node-red 0.40.2, which
+# patches/0001-openshift-ids.patch changes only in its security contexts.
 #
 # The upstream chart fixes runAsUser, runAsGroup and fsGroup to 1000.
 # OpenShift's restricted SCC assigns these IDs from the namespace's UID range
@@ -9,6 +10,16 @@
 # RuntimeDefault, no privilege escalation, all capabilities dropped) stays.
 # Each map also keeps one non-null key: Helm drops a parent map that holds
 # only nulls, and the upstream defaults then remain.
+#
+# OpenShift detection (patches/0001-openshift-ids.patch): "auto" (default)
+# checks for the API group security.openshift.io/v1. On OpenShift the
+# security contexts below are used as they are (the restricted SCC assigns
+# the IDs and rejects fixed ones); on any other cluster the keys of
+# *OutsideOpenShift are added, because nothing else assigns a non-root UID.
+# "true" or "false" skips the detection.
+global:
+  openshift: auto
+
 node-red:
   podSecurityContext:
     runAsNonRoot: true
@@ -18,3 +29,11 @@ node-red:
     runAsNonRoot: true
     runAsUser: null
     runAsGroup: null
+  # Added outside OpenShift: the image's user node-red is not numeric, so
+  # runAsNonRoot needs a numeric UID (1000, the upstream default).
+  podSecurityContextOutsideOpenShift:
+    runAsUser: 1000
+    fsGroup: 1000
+  securityContextOutsideOpenShift:
+    runAsUser: 1000
+    runAsGroup: 1000

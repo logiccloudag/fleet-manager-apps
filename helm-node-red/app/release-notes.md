@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.4
+
+- Chart: node-red-restricted 0.1.1. Fix: on a Kubernetes cluster without OpenShift the pod failed `runAsNonRoot` (`CreateContainerConfigError: container has runAsNonRoot and image will run as root`), because nothing assigned a non-root UID. The chart now checks for the API group `security.openshift.io/v1`: on OpenShift it still sets no fixed IDs (the restricted SCC assigns them); on any other cluster it uses UID and GID 1000 (with fsGroup 1000). The chart value `global.openshift` (`auto`, `true`, `false`) overrides the detection. The upstream chart is patched for this (`chart/patches/0001-openshift-ids.patch`); packaging applies the patch to the pinned, digest-checked upstream chart.
+
 ## 1.2.3
 
 - Versions no longer carry the `-openshift.<n>` suffix: the app is 1.2.3 and the chart node-red-restricted 0.1.0. The chart is unchanged apart from its version.

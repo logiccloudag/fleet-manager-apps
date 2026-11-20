@@ -316,14 +316,13 @@ YAML
 
 check_cluster() {
   local rel="$COMPONENT-check" rc=0 notready failed_events
-  # The charts set no UID, GID or fsGroup: OpenShift's restricted SCC assigns
-  # them. A plain cluster (kind) does not, and an image without a numeric
-  # non-root USER then fails runAsNonRoot. helm-<app>/ci/cluster-values.yaml
-  # sets the IDs that OpenShift would assign, for this stage only.
+  # kind is not OpenShift, so the charts set their own non-root IDs here.
+  # helm-<app>/ci/cluster-values.yaml (optional, none at the moment) adds
+  # values for this stage only.
   local cluster_values=()
   if [ -f "$REPO_ROOT/$CHECK_APP/ci/cluster-values.yaml" ]; then
     cluster_values=(-f "$REPO_ROOT/$CHECK_APP/ci/cluster-values.yaml")
-    log "$CHECK_APP: cluster stage adds ci/cluster-values.yaml (emulates OpenShift's UID assignment)"
+    log "$CHECK_APP: cluster stage adds ci/cluster-values.yaml"
   fi
   # 1. kubectl server-side dry run of the rendered objects: PSA warnings
   #    for workload objects arrive as "Warning:" lines. RoleBindings are

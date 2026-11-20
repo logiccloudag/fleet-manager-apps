@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: grafana
 metadata:
   name: Grafana
-  version: "1.5.0"
+  version: "1.5.1"
   description: >-
     Grafana 13 for dashboards and visualisation of time series data, installed
     from the upstream grafana-community Helm chart. Runs under Pod Security
@@ -34,7 +34,7 @@ deploymentProfiles:
           # Wrapper around the unchanged grafana-community grafana chart
           # 13.7.0 without fixed UID, GID and fsGroup (OpenShift; helm-grafana/chart).
           repository: oci://ghcr.io/logiccloudag/margo-charts/grafana-restricted
-          revision: "0.1.0"
+          revision: "0.1.1"
           wait: true
           timeout: "10m0s"
     requiredResources:

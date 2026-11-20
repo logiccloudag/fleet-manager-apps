@@ -38,3 +38,30 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Pod securityContext. runAsNonRoot needs a numeric non-root UID:
+- OpenShift (API group security.openshift.io/v1 present): no runAsUser, runAsGroup and fsGroup.
+  The restricted SCC assigns them from the namespace's UID range and rejects
+  fixed IDs.
+- Any other cluster: runAsUser, runAsGroup and fsGroup 1883, as nothing assigns them (the official image starts as root; 1883 is its mosquitto user, and fsGroup 1883 gives that user the volume).
+`openshift` ("auto", "true", "false") overrides the detection. Keys of
+podSecurityContext win over these defaults.
+*/}}
+{{- define "mosquitto.podSecurityContext" -}}
+{{- $mode := toString (.Values.openshift | default "auto") | lower -}}
+{{- if not (has $mode (list "auto" "true" "false")) -}}
+{{- fail (printf "openshift must be auto, true or false, not %q" $mode) -}}
+{{- end -}}
+{{- $openshift := eq $mode "true" -}}
+{{- if eq $mode "auto" -}}
+{{- $openshift = .Capabilities.APIVersions.Has "security.openshift.io/v1" -}}
+{{- end -}}
+{{- $ctx := dict "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault") -}}
+{{- if not $openshift -}}
+{{- $_ := set $ctx "runAsUser" 1883 -}}
+{{- $_ := set $ctx "runAsGroup" 1883 -}}
+{{- $_ := set $ctx "fsGroup" 1883 -}}
+{{- end -}}
+{{- toYaml (mergeOverwrite $ctx (deepCopy (.Values.podSecurityContext | default dict))) -}}
+{{- end -}}

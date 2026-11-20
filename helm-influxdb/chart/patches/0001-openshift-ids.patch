@@ -1,0 +1,68 @@
+Added by fleet-manager-apps: OpenShift-aware IDs for the influxdb2 subchart.
+scripts/lib/charts.sh applies this patch to the downloaded upstream chart
+(checked against its pinned sha256) before packaging. On OpenShift the
+security contexts are unchanged; on any other cluster the keys of
+*OutsideOpenShift in values.yaml are added.
+
+diff -ruN a/influxdb2/templates/_restricted.tpl b/influxdb2/templates/_restricted.tpl
+--- a/influxdb2/templates/_restricted.tpl
++++ b/influxdb2/templates/_restricted.tpl
+@@ -0,0 +1,30 @@
++{{/*
++Added by fleet-manager-apps (patches/0001-openshift-ids.patch), not upstream.
++
++restricted.securityContext (list <context> <securityContext> <outside OpenShift>)
++renders <securityContext>, plus every key of <outside OpenShift> it does not
++set when the cluster is not OpenShift. OpenShift's restricted SCC assigns
++runAsUser, runAsGroup and fsGroup from the namespace's UID range and rejects
++fixed IDs; any other cluster assigns none, and an image without a numeric
++non-root USER then fails runAsNonRoot. OpenShift is detected by the API group
++security.openshift.io/v1; global.openshift ("auto", "true", "false")
++overrides the detection.
++*/}}
++{{- define "restricted.securityContext" -}}
++{{- $ctx := index . 0 -}}
++{{- $sc := deepCopy ((index . 1) | default dict) -}}
++{{- $mode := toString ((($ctx.Values.global | default dict).openshift) | default "auto") | lower -}}
++{{- if not (has $mode (list "auto" "true" "false")) -}}
++{{- fail (printf "global.openshift must be auto, true or false, not %q" $mode) -}}
++{{- end -}}
++{{- $openshift := eq $mode "true" -}}
++{{- if eq $mode "auto" -}}
++{{- $openshift = $ctx.Capabilities.APIVersions.Has "security.openshift.io/v1" -}}
++{{- end -}}
++{{- if not $openshift -}}
++{{- $sc = merge $sc (deepCopy ((index . 2) | default dict)) -}}
++{{- end -}}
++{{- if $sc -}}
++{{- toYaml $sc -}}
++{{- end -}}
++{{- end -}}
+diff -ruN a/influxdb2/templates/statefulset.yaml b/influxdb2/templates/statefulset.yaml
+--- a/influxdb2/templates/statefulset.yaml
++++ b/influxdb2/templates/statefulset.yaml
+@@ -106,9 +106,10 @@
+             # Extra environment variables from .Values.env
+             {{- toYaml . | nindent 12 }}
+             {{- end }}
+-          {{- if .Values.securityContext }}
++          {{- $securityContext := include "restricted.securityContext" (list . .Values.securityContext .Values.securityContextOutsideOpenShift) | fromYaml }}
++          {{- if $securityContext }}
+           securityContext:
+-            {{- toYaml .Values.securityContext | nindent 12 }}
++            {{- toYaml $securityContext | nindent 12 }}
+           {{- end }}
+           livenessProbe:
+             httpGet:
+@@ -154,9 +155,9 @@
+           resources:
+             {{ .Values.resources | toYaml | nindent 12 | trim }}
+ 
+-      {{- if .Values.securityContext.runAsGroup }}
++      {{- if $securityContext.runAsGroup }}
+       securityContext:
+-        fsGroup: {{ .Values.securityContext.runAsGroup }}
++        fsGroup: {{ $securityContext.runAsGroup }}
+       {{- end }}
+       {{- with .Values.nodeSelector }}
+       nodeSelector:

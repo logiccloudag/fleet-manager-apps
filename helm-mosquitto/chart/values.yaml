@@ -52,8 +52,14 @@ resources:
 # Extra lines appended to mosquitto.conf.
 extraConfig: ""
 
-# Extra keys of the pod's securityContext, for example runAsUser, runAsGroup
-# and fsGroup on a cluster without OpenShift's UID assignment. Empty on
-# OpenShift: its restricted SCC rejects fixed IDs. Typed values only, so a
-# Margo parameter cannot set them (scripts/check.sh uses ci/cluster-values.yaml).
+# OpenShift detection for the pod's IDs: "auto" (default) checks for the API
+# group security.openshift.io/v1. On OpenShift the chart sets no
+# runAsUser, runAsGroup and fsGroup (the restricted SCC assigns them and rejects fixed
+# IDs); on any other cluster it sets 1883, because the official image starts
+# as root. "true" or "false" skips the detection.
+openshift: auto
+
+# Extra keys of the pod's securityContext. They win over the defaults above,
+# for example another runAsUser. Typed values only, so a Margo parameter
+# cannot set them.
 podSecurityContext: {}

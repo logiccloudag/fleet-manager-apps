@@ -18,25 +18,43 @@ GitHub Actions (see "Publishing"). The design is ADR FM-A-202.
 
 ## OpenShift branch (`rc2`)
 
-This branch is for OpenShift only. OpenShift's restricted SCC assigns each
-pod a UID, a GID and an fsGroup from the namespace's range, and rejects a pod
-that sets fixed IDs. No chart on this branch sets `runAsUser`, `runAsGroup`
-or `fsGroup` on OpenShift; `runAsNonRoot`, seccomp `RuntimeDefault`, no privilege
-escalation and dropped capabilities stay.
+This branch is built for OpenShift and also runs on other Kubernetes
+distributions. OpenShift's restricted SCC assigns each pod a UID, a GID and
+an fsGroup from the namespace's range, and rejects a pod that sets fixed
+IDs. Other clusters assign none, and an image without a numeric non-root
+USER then fails `runAsNonRoot` ("container has runAsNonRoot and image will
+run as root"). Every chart therefore checks for the API group
+`security.openshift.io/v1` (Helm's `.Capabilities`, which the agent's
+install reads from the cluster):
 
-- Mosquitto and InfluxDB: the IDs are removed from the chart.
-  Telegraf's chart never sets them.
-- Traefik: the chart checks for the API group `security.openshift.io/v1`.
-  On OpenShift it sets no IDs; on any other cluster it sets `runAsUser` and
-  `runAsGroup` 65532, because the official image runs as root. The value
-  `openshift` (`auto`, `true`, `false`) overrides the detection.
-- Grafana and Node-RED: their upstream charts fix the IDs, and a Margo
-  parameter cannot remove a typed value. Each is therefore a wrapper chart
-  (`helm-<app>/chart`) that sets the IDs to `null` and passes everything else
-  to the unchanged upstream chart. Their Helm parameter pointers start with
-  `grafana.` and `node-red.`. Helm 4 drops these `null` values when no
-  `--set` value is given; the agent always passes parameters, so this does
-  not occur in a deployment.
+| Chart | On OpenShift | On any other cluster |
+| --- | --- | --- |
+| `traefik-restricted` | no IDs | UID/GID 65532 |
+| `mosquitto-restricted` | no IDs | UID/GID/fsGroup 1883 |
+| `telegraf-restricted` | no IDs | UID/GID 10001 |
+| `influxdb2-restricted` | no IDs | UID/GID/fsGroup 1000 |
+| `node-red-restricted` | no IDs | UID/GID/fsGroup 1000 |
+| `grafana-restricted` | no IDs | UID/GID/fsGroup 472 |
+
+`runAsNonRoot`, seccomp `RuntimeDefault`, no privilege escalation and
+dropped capabilities stay everywhere. The chart value `openshift` (local
+charts) or `global.openshift` (wrappers), `auto` by default, can force
+`true` or `false`.
+
+- Mosquitto, Telegraf and Traefik: the local chart renders the pod
+  security context itself.
+- Grafana, InfluxDB and Node-RED: their upstream charts render the security
+  contexts from typed values, and a Margo parameter cannot change a typed
+  value. Each is therefore a wrapper chart (`helm-<app>/chart`): its values
+  set the upstream IDs to `null` and add the IDs for other clusters under
+  `*OutsideOpenShift`, and `chart/patches/0001-openshift-ids.patch` makes
+  the upstream templates use them. Packaging (`scripts/lib/charts.sh`)
+  downloads the pinned upstream chart, checks its sha256, applies the patch
+  without fuzz and packages the result; a patch that no longer applies
+  after an upstream bump fails the build. Helm parameter pointers start
+  with `grafana.`, `influxdb2.` and `node-red.`. Helm 4 drops the `null`
+  values when no `--set` value is given; the agent always passes
+  parameters, so this does not occur in a deployment.
 - Versions have no suffix. App versions only need to be unique on this
   branch. Chart versions share the registry `ghcr.io/logiccloudag/margo-charts`
   with `main`, so a chart version belongs to one branch: this branch uses the
@@ -46,10 +64,6 @@ escalation and dropped capabilities stay.
   collision fails the publish instead of replacing the other branch's chart.
   Compose packages have no OpenShift-specific content, so both branches
   publish the same package under the same version.
-- On other Kubernetes distributions the InfluxDB, Mosquitto, Node-RED and
-  Telegraf pods fail `runAsNonRoot`: their images do not declare a numeric
-  non-root user. Use the `main` catalog there. Traefik detects OpenShift and
-  sets UID 65532 elsewhere (see below).
 
 ## Layout
 
@@ -98,12 +112,12 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 
 | App (`id`) | Chart in `margo-charts` | Upstream chart | Chart license | Application and image | Type |
 | --- | --- | --- | --- | --- | --- |
-| `grafana` | `grafana-restricted` 0.1.0 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 (a dependency) | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | wrapper |
-| `influxdb` | `influxdb2-restricted` 0.5.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
-| `mosquitto` | `mosquitto-restricted` 0.3.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
-| `node-red` | `node-red-restricted` 0.1.0 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 (a dependency) | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | wrapper |
+| `grafana` | `grafana-restricted` 0.1.1 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 (a dependency) | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | wrapper |
+| `influxdb` | `influxdb2-restricted` 0.5.1 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
+| `mosquitto` | `mosquitto-restricted` 0.3.1 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
+| `node-red` | `node-red-restricted` 0.1.1 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 (a dependency) | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | wrapper |
 | `traefik` | `traefik-restricted` 0.3.1 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.16, copy of `docker.io/library/traefik:v3.7.16` (MIT) | local |
-| `telegraf` | `telegraf-restricted` 0.3.0 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
+| `telegraf` | `telegraf-restricted` 0.3.1 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
 
 `grafana`, `influxdb`, `mosquitto`, `node-red` and `telegraf` also have a
 compose package; its version is the `revision` of the compose component in

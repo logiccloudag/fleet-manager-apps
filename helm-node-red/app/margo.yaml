@@ -3,7 +3,7 @@ kind: ApplicationDescription
 id: node-red
 metadata:
   name: Node-RED
-  version: "1.2.3"
+  version: "1.2.4"
   description: >-
     Node-RED 4 low-code flow editor for wiring devices, APIs and services,
     installed from the upstream schwarzit Helm chart. Runs under Pod Security
@@ -33,7 +33,7 @@ deploymentProfiles:
           # Wrapper around the unchanged schwarzit node-red chart 0.40.2
           # without fixed UID, GID and fsGroup (OpenShift; helm-node-red/chart).
           repository: oci://ghcr.io/logiccloudag/margo-charts/node-red-restricted
-          revision: "0.1.0"
+          revision: "0.1.1"
           wait: true
           timeout: "10m0s"
     requiredResources:

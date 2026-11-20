@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.5.1
+
+- Chart: grafana-restricted 0.1.1. Fix: on a Kubernetes cluster without OpenShift the pod failed `runAsNonRoot` (`CreateContainerConfigError: container has runAsNonRoot and image will run as root`), because nothing assigned a non-root UID. The chart now checks for the API group `security.openshift.io/v1`: on OpenShift it still sets no fixed IDs (the restricted SCC assigns them); on any other cluster it uses UID and GID 472 (with fsGroup 472). The chart value `global.openshift` (`auto`, `true`, `false`) overrides the detection. The upstream chart is patched for this (`chart/patches/0001-openshift-ids.patch`); packaging applies the patch to the pinned, digest-checked upstream chart.
+
 ## 1.5.0
 
 - New setting `allowEmbedding` (section Sharing): `[security] allow_embedding` in `grafana.ini`, set through Grafana's environment override `GF_SECURITY_ALLOW_EMBEDDING`. `true` lets other web pages show Grafana in an iframe; `false` (the default, as in Grafana) keeps browsers from embedding it. An embedded dashboard still needs a login, or a public dashboard (`publicDashboards`).

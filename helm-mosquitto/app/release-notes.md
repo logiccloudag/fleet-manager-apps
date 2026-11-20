@@ -1,5 +1,9 @@
 # Release Notes
 
+## 2.2.4
+
+- Chart: mosquitto-restricted 0.3.1. Fix: on a Kubernetes cluster without OpenShift the pod failed `runAsNonRoot` (`CreateContainerConfigError: container has runAsNonRoot and image will run as root`), because nothing assigned a non-root UID. The chart now checks for the API group `security.openshift.io/v1`: on OpenShift it still sets no fixed IDs (the restricted SCC assigns them); on any other cluster it uses UID and GID 1883 (with fsGroup 1883). The chart value `openshift` (`auto`, `true`, `false`) overrides the detection.
+
 ## 2.2.3
 
 - Versions no longer carry the `-openshift.<n>` suffix: the app is 2.2.3 and the chart mosquitto-restricted 0.3.0. The chart is unchanged apart from its version.
