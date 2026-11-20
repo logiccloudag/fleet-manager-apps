@@ -69,15 +69,15 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | `influxdb` | `influxdb2-restricted` 0.4.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.9.1, copy of `docker.io/library/influxdb:2.9.1-alpine` (MIT) | wrapper |
 | `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
-| `traefik` | `traefik-restricted` 0.2.3 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.19, copy of `docker.io/library/traefik:v3.7.19` (MIT) | local |
+| `traefik` | `traefik-restricted` 0.2.4 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.19, copy of `docker.io/library/traefik:v3.7.19` (MIT) | local |
 | `telegraf` | `telegraf-restricted` 0.2.0 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |
 
 The `rc2` branch publishes to the same chart registry. A chart version
 belongs to one branch, so `main` never uses a chart version from `rc2`'s
-`scripts/charts.tsv` (`grafana-restricted` 0.1.0, `influxdb2-restricted`
-0.3.0 and 0.5.0, `mosquitto-restricted` 0.3.0, `node-red-restricted` 0.1.0,
-`traefik-restricted` 0.3.0, `telegraf-restricted` 0.3.0): the next
-`influxdb2-restricted` on `main` is 0.6.0, for example. `mirror-charts.sh`
+`scripts/charts.tsv`: `grafana-restricted` 0.1.x, `influxdb2-restricted`
+0.3.x and 0.5.x, `mosquitto-restricted` 0.3.x, `node-red-restricted` 0.1.x,
+`traefik-restricted` 0.3.x and `telegraf-restricted` 0.3.x are `rc2`'s. The
+next `influxdb2-restricted` on `main` is 0.6.0, for example. `mirror-charts.sh`
 refuses to overwrite a tag with different content.
 
 `grafana`, `influxdb`, `mosquitto`, `node-red` and `telegraf` also have a
