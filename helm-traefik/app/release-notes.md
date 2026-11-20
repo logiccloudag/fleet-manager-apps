@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.4
+
+- Chart: traefik-restricted 0.3.2. Fix: with a NodePort or ClusterIP Service, Traefik logged `ERR Error while updating ingress status error="node port service type is not supported when cluster scope resources lookup is disabled"` on every sync. The chart set `ingressEndpoint.publishedService` for every Service type, but Traefik cannot read node addresses without cluster-scope lookups. The chart now sets it only for `serviceType` `LoadBalancer`; with other types Traefik leaves the Ingress status (ADDRESS) unchanged. Routing was never affected.
+
 ## 1.2.3
 
 - Chart: traefik-restricted 0.3.1. Fix: on a Kubernetes cluster without OpenShift the pod failed with `CreateContainerConfigError: container has runAsNonRoot and image will run as root`, because nothing assigned a UID and the official image runs as root. The chart now checks for the API group `security.openshift.io/v1`: on OpenShift it still sets no `runAsUser` or `runAsGroup` (the restricted SCC assigns them); on any other cluster it sets both to 65532. The chart value `openshift` (`auto`, `true`, `false`) overrides the detection.
