@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.3
+
+- Chart: traefik-restricted 0.3.1. Fix: on a Kubernetes cluster without OpenShift the pod failed with `CreateContainerConfigError: container has runAsNonRoot and image will run as root`, because nothing assigned a UID and the official image runs as root. The chart now checks for the API group `security.openshift.io/v1`: on OpenShift it still sets no `runAsUser` or `runAsGroup` (the restricted SCC assigns them); on any other cluster it sets both to 65532. The chart value `openshift` (`auto`, `true`, `false`) overrides the detection.
+
 ## 1.2.2
 
 - Versions no longer carry the `-openshift.<n>` suffix: the app is 1.2.2 and the chart traefik-restricted 0.3.0. The chart is unchanged apart from its version.

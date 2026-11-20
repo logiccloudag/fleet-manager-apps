@@ -39,8 +39,14 @@ resources:
   limits:
     memory: 128Mi
 
-# Extra keys of the pod's securityContext, for example runAsUser, runAsGroup
-# and fsGroup on a cluster without OpenShift's UID assignment. Empty on
-# OpenShift: its restricted SCC rejects fixed IDs. Typed values only, so a
-# Margo parameter cannot set them (scripts/check.sh uses ci/cluster-values.yaml).
+# OpenShift detection for the pod's UID: "auto" (default) checks for the API
+# group security.openshift.io/v1. On OpenShift the chart sets no runAsUser or
+# runAsGroup (the restricted SCC assigns them and rejects fixed IDs); on any
+# other cluster it sets 65532, because the official image runs as root.
+# "true" or "false" skips the detection.
+openshift: auto
+
+# Extra keys of the pod's securityContext. They win over the defaults above,
+# for example another runAsUser. Typed values only, so a Margo parameter
+# cannot set them.
 podSecurityContext: {}

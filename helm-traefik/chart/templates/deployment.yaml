@@ -17,15 +17,8 @@ spec:
       serviceAccountName: {{ include "traefik.fullname" . }}
       enableServiceLinks: false
       terminationGracePeriodSeconds: 30
-      # No runAsUser or runAsGroup: OpenShift's restricted SCC assigns them
-      # from the namespace's UID range and rejects fixed IDs.
       securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-        {{- with .Values.podSecurityContext }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        {{- include "traefik.podSecurityContext" . | nindent 8 }}
       containers:
         - name: traefik
           image: {{ include "traefik.image" . | quote }}

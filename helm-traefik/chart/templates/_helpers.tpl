@@ -36,3 +36,30 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- $port -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Pod securityContext. The official traefik image runs as root (no USER), so
+runAsNonRoot needs a UID from somewhere:
+- OpenShift (API group security.openshift.io/v1 present): no runAsUser or
+  runAsGroup. The restricted SCC assigns them from the namespace's UID range
+  and rejects fixed IDs.
+- Any other cluster: runAsUser and runAsGroup 65532, as nothing assigns them.
+`openshift` ("auto", "true", "false") overrides the detection. Keys of
+podSecurityContext win over these defaults.
+*/}}
+{{- define "traefik.podSecurityContext" -}}
+{{- $mode := toString (.Values.openshift | default "auto") | lower -}}
+{{- if not (has $mode (list "auto" "true" "false")) -}}
+{{- fail (printf "openshift must be auto, true or false, not %q" $mode) -}}
+{{- end -}}
+{{- $openshift := eq $mode "true" -}}
+{{- if eq $mode "auto" -}}
+{{- $openshift = .Capabilities.APIVersions.Has "security.openshift.io/v1" -}}
+{{- end -}}
+{{- $ctx := dict "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault") -}}
+{{- if not $openshift -}}
+{{- $_ := set $ctx "runAsUser" 65532 -}}
+{{- $_ := set $ctx "runAsGroup" 65532 -}}
+{{- end -}}
+{{- toYaml (mergeOverwrite $ctx (deepCopy (.Values.podSecurityContext | default dict))) -}}
+{{- end -}}
