@@ -40,7 +40,14 @@ spec:
             - --providers.kubernetesingress.namespaces={{ .Release.Namespace }}
             - --providers.kubernetesingress.disableClusterScopeResources=true
             - --providers.kubernetesingress.allowEmptyServices=true
+            {{- if eq (toString .Values.service.type) "LoadBalancer" }}
+            # Ingress status: the load balancer address of the Service. Only
+            # for a LoadBalancer Service: with disableClusterScopeResources
+            # Traefik cannot look up the node addresses of a NodePort Service
+            # and logs "node port service type is not supported" on every
+            # sync. Other types leave the Ingress status unchanged.
             - --providers.kubernetesingress.ingressEndpoint.publishedService={{ .Release.Namespace }}/{{ include "traefik.fullname" . }}
+            {{- end }}
             {{- with .Values.ingressClass }}
             - --providers.kubernetesingress.ingressClass={{ . }}
             {{- end }}

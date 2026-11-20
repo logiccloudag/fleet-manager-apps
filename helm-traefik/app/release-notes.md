@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.4
+
+- Chart: traefik-restricted 0.2.4. Fix: with a NodePort or ClusterIP Service, Traefik logged `ERR Error while updating ingress status error="node port service type is not supported when cluster scope resources lookup is disabled"` on every sync. The chart set `ingressEndpoint.publishedService` for every Service type, but Traefik cannot read node addresses without cluster-scope lookups. The chart now sets it only for `serviceType` `LoadBalancer`; with other types Traefik leaves the Ingress status (ADDRESS) unchanged. Routing was never affected.
+
 ## 1.2.3
 
 - The catalog names the vendor, Traefik Labs, instead of logiccloud, which only packages the app.
