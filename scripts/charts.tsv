@@ -15,5 +15,5 @@ helm-grafana	grafana-restricted	0.1.1	wrapper	helm-grafana/chart	9637fa5584b3740
 helm-influxdb	influxdb2-restricted	0.5.1	wrapper	helm-influxdb/chart	1da8b1e8a2b93e9acbb0bc9a9c0a3e526581ccde4bf271785d09699ed219ca08
 helm-mosquitto	mosquitto-restricted	0.3.1	local	helm-mosquitto/chart	-
 helm-node-red	node-red-restricted	0.1.1	wrapper	helm-node-red/chart	503b99d1cf5c0599c990f28ab63ed660d8389159f5d24f7bbaaf3ed150a016e2
-helm-traefik	traefik-restricted	0.3.1	local	helm-traefik/chart	-
+helm-traefik	traefik-restricted	0.3.2	local	helm-traefik/chart	-
 helm-telegraf	telegraf-restricted	0.3.1	local	helm-telegraf/chart	-
