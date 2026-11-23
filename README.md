@@ -67,7 +67,7 @@ reference it as `<name>:<tag>@<digest>`. `scripts/images.tsv` pins it.
 | --- | --- | --- | --- | --- | --- |
 | `grafana` | `grafana` 13.7.0 | `oci://ghcr.io/grafana-community/helm-charts/grafana` 13.7.0 | Apache-2.0 | Grafana 13.2.4, copy of `docker.io/grafana/grafana:13.2.4-distroless` (AGPL-3.0) | mirror |
 | `influxdb` | `influxdb2-restricted` 0.5.0 | `influxdb2` 2.1.2 from `https://helm.influxdata.com` (a dependency) | MIT | InfluxDB 2.10.1, copy of `docker.io/library/influxdb:2.10.1-alpine` (MIT) | wrapper |
-| `mosquitto` | `mosquitto-restricted` 0.2.0 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.2, copy of `docker.io/library/eclipse-mosquitto:2.1.2-alpine` (EPL-2.0/EDL-1.0) | local |
+| `mosquitto` | `mosquitto-restricted` 0.2.1 | none: the chart is in `helm-mosquitto/chart` | this repository | Eclipse Mosquitto 2.1.4, copy of `docker.io/library/eclipse-mosquitto:2.1.4-alpine` (EPL-2.0/EDL-1.0) | local |
 | `node-red` | `node-red` 0.40.2 | `oci://ghcr.io/schwarzit/charts/node-red` 0.40.2 | Apache-2.0 | Node-RED 4.1.2, copy of `docker.io/nodered/node-red:4.1.2` (Apache-2.0) | mirror |
 | `traefik` | `traefik-restricted` 0.2.4 | none: the chart is in `helm-traefik/chart` | this repository | Traefik v3.7.19, copy of `docker.io/library/traefik:v3.7.19` (MIT) | local |
 | `telegraf` | `telegraf-restricted` 0.2.0 | none: the chart is in `helm-telegraf/chart` | this repository | Telegraf 1.40.3, copy of `docker.io/library/telegraf:1.40.3-alpine` (MIT) | local |

@@ -1,5 +1,12 @@
 # Release Notes
 
+## 2.2.3
+
+- Image: `ghcr.io/logiccloudag/margo-images/eclipse-mosquitto:2.1.4-alpine`, a copy of `docker.io/library/eclipse-mosquitto:2.1.4-alpine` (2.1.2-alpine before).
+- Chart: mosquitto-restricted 0.2.0 → 0.2.1.
+- Compose package 1.0.2 with the new image.
+- Automatic update by the weekly upstream check (FM-1631).
+
 ## 2.2.2
 
 - Compose package 1.0.1: the image is referenced by tag only (`ghcr.io/logiccloudag/margo-images/eclipse-mosquitto:2.1.2-alpine`), without `@sha256:` digest. The FLECS device agent rejected the `tag@digest` form with Docker error 400 "invalid reference format", which also aborted the other deployments on the device. The image and its digest are unchanged; the tag is immutable in `ghcr.io/logiccloudag/margo-images`.

@@ -15,7 +15,7 @@
 # with one user in memory (tmpfs).
 services:
   mosquitto:
-    image: ghcr.io/logiccloudag/margo-images/eclipse-mosquitto:2.1.2-alpine
+    image: ghcr.io/logiccloudag/margo-images/eclipse-mosquitto:2.1.4-alpine
     restart: unless-stopped
     # The image's own user mosquitto, a read-only root file system and no
     # capability, like the Helm profile. The listener port must be 1024 or

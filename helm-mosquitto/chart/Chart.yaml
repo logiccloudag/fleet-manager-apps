@@ -7,8 +7,8 @@ description: >-
   Deployment) and anonymous access disabled by default. Every value is read
   string-safely, because the agent sets Margo parameters as strings.
 type: application
-version: 0.2.0
-appVersion: "2.1.2"
+version: 0.2.1
+appVersion: "2.1.4"
 kubeVersion: ">=1.21.0-0"
 home: https://github.com/logiccloudag/fleet-manager-apps
 sources:
