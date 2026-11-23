@@ -12,7 +12,7 @@
 # empty volume (the image's setup mode). Later changes have no effect.
 services:
   influxdb:
-    image: ghcr.io/logiccloudag/margo-images/influxdb:2.9.1-alpine
+    image: ghcr.io/logiccloudag/margo-images/influxdb:2.10.1-alpine
     restart: unless-stopped
     # The image's own user influxdb. Its entrypoint then skips the root-only
     # steps (chown, setpriv), so no capability is needed.

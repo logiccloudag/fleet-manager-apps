@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.4.0
+
+- Image: `ghcr.io/logiccloudag/margo-images/influxdb:2.10.1-alpine`, a copy of `docker.io/library/influxdb:2.10.1-alpine` (2.9.1-alpine before).
+- Compose package 1.2.0 with the new image.
+- Automatic update by the weekly upstream check (FM-1631).
+
 ## 1.3.0
 
 - New setting `v1Databases` (section InfluxQL): InfluxDB 1.x (v1) databases mapped to buckets (DBRP mappings), for InfluxQL clients such as a Grafana data source with query language InfluxQL, and dashboards written in InfluxQL, that expect a database name other than the bucket's. InfluxDB already maps every bucket to the database of the same name (virtual mappings), so the bucket `telegraf` is the database `telegraf` without an entry. Comma separated entries `bucket:database`, for example `default:telegraf`; empty by default. A missing bucket is created with the initial bucket's retention.
